@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/*
+ * KeyChain Design System
+ * Palette: Qinghua porcelain (青花瓷) — cobalt blue + warm white
+ * Typography: Playfair Display (display) + Inter (body) + JetBrains Mono (data)
+ * Reference: design-reference/uploads/KeyChain_Frontend_Design_Brief.md
+ */
+
+/* ── Fonts ── */
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap");
+
+/* ── Light theme (default) ── */
+:root {
+  /* Backgrounds */
+  --bg-primary: #f5f2ed;
+  --bg-secondary: #edeae5;
+  --bg-tertiary: #ffffff;
+
+  /* Text */
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
+
+  /* Accent — cobalt blue, the ONLY accent */
+  --accent-primary: #1e3a8a;
+  --accent-hover: #1e40af;
+  --accent-soft: #1e3a8a14;
+
+  /* Semantic */
+  --success: #166534;
+  --warning: #92400e;
+  --error: #991b1b;
+
+  /* Borders */
+  --border: #d4d0cb;
+
+  /* Typography */
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-hero: clamp(3rem, 5vw, 4rem);
+
+  /* Spacing */
+  --navbar-height: 64px;
+}
+
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --bg-primary: #0d0d0d;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #252525;
+
+  --text-primary: #f5f2ed;
+  --text-secondary: #9e9e9e;
+
+  --accent-primary: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-soft: #3b82f614;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+
+  --border: #333333;
+}
+
+/* ── Base reset ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Typography utilities ── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ── Scrollbar styling (subtle) ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* ── Selection color ── */
+::selection {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
