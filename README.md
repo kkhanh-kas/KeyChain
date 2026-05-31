@@ -26,7 +26,7 @@
 
 | Hạng mục | File | Ưu tiên |
 |---|---|---|
-| KeyCoin.sol | ERC-20, buyKeyCoin, setRate, mint, burn | 🔴 Đầu tiên |
+| KeyCoin.sol | ERC-20, buyKeyCoin, setRate, withdraw | 🔴 Đầu tiên |
 | GameToken.sol | ERC-1155, ERC-2981, mint, royaltyInfo, uri | 🔴 Đầu tiên |
 | GameStore.sol | Catalog, purchaseLicense, RBAC | 🔴 Thứ hai |
 | ActivationContract.sol | Hardware hash binding, activate/deactivate | 🟡 Thứ ba |
