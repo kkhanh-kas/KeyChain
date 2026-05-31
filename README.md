@@ -56,7 +56,7 @@
 ### Tấn Phát: Unit Tests (Advanced Contracts)
 
 **Code**
-- `ActivationContract.test.ts` : activate, deactivate, machineHash binding, signature replay
+- `ActivationContract.test.ts` : activate, deactivate, machineHash binding, ownership verification, double-activation prevention
 - `Marketplace.test.ts` : listLicense, buyLicense, royalty distribution, activation reset
 - `GamePass.test.ts` : subscribe, renew, expiry, expired renewal
 - Mục tiêu: branch coverage ≥ 80%
