@@ -132,7 +132,7 @@ Buffer        16/06 (T2) → 18/06 (T4)      Nộp
 |---|---|---|
 | **Uyên Khánh** | Viết GameStore.sol + ActivationContract.sol. Bắt đầu frontend với mock data (Landing, Store, Library pages). | **04/06** |
 | **Công Danh** | Hoàn thiện tests KeyCoin + GameToken. Bắt đầu tests GameStore. | 05/06 |
-| **Tấn Phát** | Bắt đầu tests ActivationContract khi F commit interface. Viết Chương 4.2 + 4.3. | 05/06 |
+| **Tấn Phát** | Bắt đầu tests ActivationContract khi Khánh commit interface. Viết Chương 4.2 + 4.3. | 05/06 |
 | **Phước Tình** | Viết setup-roles.ts + seed-games.ts. Bắt đầu integration test skeleton. | 06/06 |
 | **Mỹ Khánh** | Hoàn thiện Chương 2 toàn bộ. Bắt đầu Chương 3. | 05/06 |
 | **Hoài Nam** | Hoàn thiện Chương 4. Bắt đầu Chương 5.2 (mô tả contracts). | 05/06 |
