@@ -118,6 +118,7 @@ Buffer        16/06 (T2) → 18/06 (T4)      Nộp
 | Người | Việc cần làm | Deadline nội bộ |
 |---|---|---|
 | **Uyên Khánh** | Viết KeyCoin.sol + GameToken.sol. Commit interface (function signatures + events) lên repo. Setup Hardhat project. | **31/05** |
+| **Công Danh** | Setup test environment. Bắt đầu viết tests cho KeyCoin + GameToken ngay khi F commit interface. | 01/06 |
 | **Tấn Phát** | Đọc kỹ outline Chương 4.2 + 4.3. Phác thảo state machine và sơ đồ RBAC. | 01/06 |
 | **Phước Tình** | Setup deploy pipeline, viết deploy.ts skeleton, chuẩn bị Alchemy RPC + Etherscan key. | 01/06 |
 | **Mỹ Khánh** | Viết draft Chương 1 hoàn chỉnh. Bắt đầu Chương 2.1 + 2.2. | 01/06 |
@@ -129,12 +130,12 @@ Buffer        16/06 (T2) → 18/06 (T4)      Nộp
 
 | Người | Việc cần làm | Deadline nội bộ |
 |---|---|---|
-| **Uyên Khánh** | Viết GameStore.sol + ActivationContract.sol. Bắt đầu frontend với mock data (Landing, Store, Library pages). | **06/06** |
-| **Công Danh** | Hoàn thiện tests KeyCoin + GameToken. Bắt đầu tests GameStore. | 06/06 |
-| **Tấn Phát** | Bắt đầu tests ActivationContract khi F commit interface. Viết Chương 4.2 + 4.3. | 06/06 |
+| **Uyên Khánh** | Viết GameStore.sol + ActivationContract.sol. Bắt đầu frontend với mock data (Landing, Store, Library pages). | **04/06** |
+| **Công Danh** | Hoàn thiện tests KeyCoin + GameToken. Bắt đầu tests GameStore. | 05/06 |
+| **Tấn Phát** | Bắt đầu tests ActivationContract khi F commit interface. Viết Chương 4.2 + 4.3. | 05/06 |
 | **Phước Tình** | Viết setup-roles.ts + seed-games.ts. Bắt đầu integration test skeleton. | 06/06 |
-| **Mỹ Khánh** | Hoàn thiện Chương 2 toàn bộ. Bắt đầu Chương 3. | 06/06 |
-| **Hoài Nam** | Hoàn thiện Chương 4. Bắt đầu Chương 5.2 (mô tả contracts). | 06/06 |
+| **Mỹ Khánh** | Hoàn thiện Chương 2 toàn bộ. Bắt đầu Chương 3. | 05/06 |
+| **Hoài Nam** | Hoàn thiện Chương 4. Bắt đầu Chương 5.2 (mô tả contracts). | 05/06 |
 
 ---
 
@@ -142,12 +143,12 @@ Buffer        16/06 (T2) → 18/06 (T4)      Nộp
 
 | Người | Việc cần làm | Deadline nội bộ |
 |---|---|---|
-| **Uyên Khánh** | Viết Marketplace.sol + GamePass.sol. Hoàn thiện frontend (Marketplace, Vendor Portal). Swap mock data → real hooks. Viết Pinata API routes. | **13/06** |
-| **Công Danh** | Hoàn thiện tất cả unit tests. Chạy coverage report. Viết Chương 2.3 + 6.1.1. | 13/06 |
-| **Tấn Phát** | Hoàn thiện tất cả unit tests. Chạy Slither. Viết Chương 6.1.1 (phần B) + 6.3. | 13/06 |
-| **Phước Tình** | Hoàn thiện integration tests. Deploy lên Sepolia. Verify trên Etherscan. Chụp screenshots. Viết Chương 5.3 + 6.1.2 + 6.2. | 13/06 |
-| **Mỹ Khánh** | Hoàn thiện Chương 3. Viết phần 5.1 (phần D). | 13/06 |
-| **Hoài Nam** | Viết Chương 6.4 + 7. **Bắt đầu review + format tổng toàn bộ report ngay khi nhận draft.** | 13/06 |
+| **Uyên Khánh** | Viết Marketplace.sol + GamePass.sol. Hoàn thiện frontend (Marketplace, Vendor Portal). Swap mock data → real hooks. Viết Pinata API routes. | **09/06** |
+| **Công Danh** | Hoàn thiện tất cả unit tests. Chạy coverage report. Viết Chương 2.3 + 6.1.1. | 11/06 |
+| **Tấn Phát** | Hoàn thiện tất cả unit tests. Chạy Slither. Viết Chương 6.1.1 (phần B) + 6.3. | 11/06 |
+| **Phước Tình** | Hoàn thiện integration tests. Deploy lên Sepolia. Verify trên Etherscan. Chụp screenshots. Viết Chương 5.3 + 6.1.2 + 6.2. | 11/06 |
+| **Mỹ Khánh** | Hoàn thiện Chương 3. Viết phần 5.1 (phần D). | 11/06 |
+| **Hoài Nam** | Viết Chương 6.4 + 7. **Bắt đầu review + format tổng toàn bộ report ngay khi nhận draft.** | 11/06 |
 
 ---
 
