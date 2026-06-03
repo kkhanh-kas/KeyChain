@@ -142,8 +142,9 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Claude 
+# Local Agent 
 .claude/
 CLAUDE.md
+AGENTS.md
 docs/
 CONTEXT.md 
