@@ -148,3 +148,12 @@ CLAUDE.md
 AGENTS.md
 docs/
 CONTEXT.md 
+
+node_modules/
+.env
+coverage/
+coverage.json
+typechain-types/
+typechain/
+artifacts/
+cache/
