@@ -33,6 +33,15 @@ describe("KeyCoin", function () {
       expect(await keyCoin.rate()).to.equal(newRate);
     });
 
+    // CASE MỚI: Check việc buy theo rate mới
+    it("Should mint at the new rate after setRate", async function () {
+      const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
+      await keyCoin.setRate(200n);
+      const ethAmount = ethers.parseEther("1");
+      await keyCoin.connect(user1).buyKeyCoin({ value: ethAmount });
+      expect(await keyCoin.balanceOf(user1.address)).to.equal(ethAmount * 200n);
+    });
+
     it("Should revert if non-admin tries to update the rate", async function () {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
       const newRate = 200n;
@@ -46,16 +55,13 @@ describe("KeyCoin", function () {
     it("Should mint correct amount of KEY based on ETH sent and current rate", async function () {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
       const ethAmount = ethers.parseEther("1");
-      
       await keyCoin.connect(user1).buyKeyCoin({ value: ethAmount });
-      
       const expectedKey = ethAmount * INITIAL_RATE;
       expect(await keyCoin.balanceOf(user1.address)).to.equal(expectedKey);
     });
 
     it("Should revert if no ETH is sent", async function () {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
-      // Đổi 0 thành 0n (bigint) để tránh lỗi type
       await expect(keyCoin.connect(user1).buyKeyCoin({ value: 0n }))
         .to.be.revertedWith("KeyCoin: no ETH sent");
     });
@@ -64,18 +70,13 @@ describe("KeyCoin", function () {
   describe("withdraw", function () {
     it("Should allow admin to withdraw ETH from contract", async function () {
       const { keyCoin, admin, user1 } = await loadFixture(deployKeyCoinFixture);
-      
       const ethAmount = ethers.parseEther("2");
       await keyCoin.connect(user1).buyKeyCoin({ value: ethAmount });
-      
       const initialAdminBalance = await ethers.provider.getBalance(admin.address);
       const tx = await keyCoin.withdraw();
       const receipt = await tx.wait();
-      
-      // Ép kiểu tường minh về BigInt
       const gasUsed = BigInt(receipt!.gasUsed) * BigInt(receipt!.gasPrice);
       const finalAdminBalance = await ethers.provider.getBalance(admin.address);
-      
       expect(finalAdminBalance).to.equal(initialAdminBalance + ethAmount - gasUsed);
     });
 
