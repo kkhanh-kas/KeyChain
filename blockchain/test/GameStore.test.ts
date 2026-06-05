@@ -56,7 +56,6 @@ describe("GameStore", function () {
       expect(await gameToken.uri(1n)).to.equal(uri);
     });
 
-    // Check chặn người không phải vendor
     it("Should revert if non-vendor tries to register a game", async function () {
       const { gameStore, unauthorizedUser } = await loadFixture(deployGameStoreFixture);
       await expect(
@@ -70,6 +69,7 @@ describe("GameStore", function () {
     it("Should allow the owning vendor to pause and resume game sales", async function () {
       const { gameStore, vendor } = await loadFixture(deployGameStoreFixture);
       await gameStore.connect(vendor).registerGame("Game", 100n, 500n, "ipfs://");
+      
       await gameStore.connect(vendor).setGameListed(1n, false);
       let catalog = await gameStore.getCatalog();
       expect(catalog.infos[0].isListed).to.be.false;
@@ -81,10 +81,19 @@ describe("GameStore", function () {
 
     it("Should allow admin to takedown (pause) any game", async function () {
       const { gameStore, admin, vendor } = await loadFixture(deployGameStoreFixture);
-      await gameStore.connect(vendor).registerGame("Game", 100n, 500n, "ipfs://");
+      await gameStore.connect(vendor).registerGame("Game", 100n, 500n, "ipfs://");     
       await gameStore.connect(admin).setGameListed(1n, false);
       const catalog = await gameStore.getCatalog();
       expect(catalog.infos[0].isListed).to.be.false;
+    });
+
+    it("Should revert if unauthorized user tries to list/unlist a game", async function () {
+      const { gameStore, vendor, unauthorizedUser } = await loadFixture(deployGameStoreFixture);
+      await gameStore.connect(vendor).registerGame("Game", 100n, 500n, "ipfs://");
+
+      await expect(
+        gameStore.connect(unauthorizedUser).setGameListed(1n, false)
+      ).to.be.revertedWith("GameStore: not authorized");
     });
   });
 
