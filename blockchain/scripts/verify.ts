@@ -1,15 +1,15 @@
 /**
- * KeyChain — verify.ts
+ * KeyChain - verify.ts
  * ====================
- * Nhiệm vụ chính:
- *   1. Đọc địa chỉ 6 contracts từ deployments/<network>.json
- *   2. Gọi hardhat verify cho từng contract với đúng constructor args
- *   3. Bỏ qua contract đã verify trước đó (idempotent)
- *   4. In link Etherscan cho từng contract sau khi verify thành công
+ * Tasks:
+ *   1. Read the 6 contract addresses from deployments/<network>.json
+ *   2. Call hardhat verify for each contract with the correct constructor args
+ *   3. Skip contracts already verified (idempotent)
+ *   4. Print the Etherscan link for each contract after a successful verify
  *
- * Yêu cầu:
- *   - deploy.ts đã chạy xong → deployments/sepolia.json tồn tại
- *   - ETHERSCAN_API_KEY có trong .env
+ * Requirements:
+ *   - deploy.ts has run -> deployments/sepolia.json exists
+ *   - ETHERSCAN_API_KEY is set in .env
  *
  * Usage:
  *   npx hardhat run scripts/verify.ts --network sepolia
@@ -24,21 +24,21 @@ import hre from "hardhat";
 
 dotenv.config();
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// --- Helpers ---
 
-/** Đọc deployment addresses từ file JSON do deploy.ts tạo ra. */
+/** Read deployment addresses from the JSON file produced by deploy.ts. */
 function loadDeployment(network: string): Record<string, string> {
   const filePath = path.join(__dirname, "..", "deployments", `${network}.json`);
   if (!fs.existsSync(filePath)) {
     throw new Error(
       `Deployment file not found: ${filePath}\n` +
-        `Hãy chạy deploy.ts trước: npm run deploy:${network}`
+        `Run deploy.ts first: npm run deploy:${network}`
     );
   }
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-/** Link Etherscan cho từng network. */
+/** Etherscan link for a given network. */
 function explorerUrl(network: string, address: string): string {
   if (network === "sepolia") {
     return `https://sepolia.etherscan.io/address/${address}#code`;
@@ -47,8 +47,8 @@ function explorerUrl(network: string, address: string): string {
 }
 
 /**
- * Verify một contract. Nếu đã verify rồi thì bỏ qua,
- * không throw để tiếp tục verify các contract còn lại.
+ * Verify a single contract. If it is already verified, skip it without
+ * throwing so the remaining contracts still get verified.
  */
 async function verifyContract(
   name: string,
@@ -56,49 +56,47 @@ async function verifyContract(
   constructorArguments: unknown[],
   network: string
 ) {
-  process.stdout.write(`  ⏳  ${name.padEnd(22)}`);
+  process.stdout.write(`  ${name.padEnd(22)}`);
 
   try {
     await run("verify:verify", {
       address,
       constructorArguments,
     });
-    console.log(`✅  ${explorerUrl(network, address)}`);
+    console.log(`OK  ${explorerUrl(network, address)}`);
   } catch (err: any) {
-    // Etherscan trả về lỗi này nếu contract đã được verify trước đó
+    // Etherscan returns this error if the contract was already verified
     if (
       err?.message?.toLowerCase().includes("already verified") ||
       err?.message?.toLowerCase().includes("already been verified")
     ) {
-      console.log(`⏭   Already verified  →  ${explorerUrl(network, address)}`);
+      console.log(`Already verified  ->  ${explorerUrl(network, address)}`);
     } else {
-      // Lỗi thật sự — in ra nhưng không dừng script
-      console.log(`❌  FAILED`);
+      // Real error - print it but do not stop the script
+      console.log(`FAILED`);
       console.error(`      ${err?.message ?? err}`);
     }
   }
 }
 
-// ─── Main ──────────────────────────────────────────────────────────────────
+// --- Main ---
 
 async function main() {
-  // Kiểm tra ETHERSCAN_API_KEY
+  // Check ETHERSCAN_API_KEY
   if (!process.env.ETHERSCAN_API_KEY) {
     throw new Error(
-      "ETHERSCAN_API_KEY chưa được set trong .env\n" +
-        "Lấy key tại: https://etherscan.io/myapikey"
+      "ETHERSCAN_API_KEY is not set in .env\n" +
+        "Get a key at: https://etherscan.io/myapikey"
     );
   }
 
-  // Lấy network từ Hardhat runtime
+  // Get the network from the Hardhat runtime
   const { ethers } = await import("hardhat");
   const network = hre.network.name;
 
-  console.log("━".repeat(55));
-  console.log(`  KeyChain verify  |  network: ${network}`);
-  console.log("━".repeat(55));
+  console.log(`KeyChain verify  |  network: ${network}`);
 
-  // Đọc deployment addresses
+  // Read deployment addresses
   const deployment = loadDeployment(network);
 
   const {
@@ -110,37 +108,37 @@ async function main() {
     GamePass,
   } = deployment;
 
-  // Kiểm tra tất cả địa chỉ có đủ không
+  // Check that all addresses are present
   const required = ["KeyCoin", "GameToken", "GameStore", "ActivationContract", "Marketplace", "GamePass"];
   for (const name of required) {
     if (!deployment[name]) {
-      throw new Error(`Thiếu địa chỉ ${name} trong deployment file.`);
+      throw new Error(`Missing ${name} address in deployment file.`);
     }
   }
 
-  // KEYCOIN_RATE phải khớp với giá trị dùng khi deploy
-  // Nếu bạn đã đổi giá trị này trong deploy.ts thì đổi ở đây theo
+  // KEYCOIN_RATE must match the value used at deploy time.
+  // If you changed it in deploy.ts, change it here too.
   const KEYCOIN_RATE = ethers.parseUnits("1000", 18);
 
-  console.log(`\n🔍  Verifying 6 contracts trên ${network}...\n`);
+  console.log(`\nVerifying 6 contracts on ${network}...\n`);
 
-  // ── 1. KeyCoin ────────────────────────────────────────────────
+  // 1. KeyCoin
   // constructor(uint256 initialRate)
   await verifyContract("KeyCoin", KeyCoin, [KEYCOIN_RATE], network);
 
-  // ── 2. GameToken ──────────────────────────────────────────────
-  // constructor()  — không có args
+  // 2. GameToken
+  // constructor()  - no args
   await verifyContract("GameToken", GameToken, [], network);
 
-  // ── 3. GameStore ──────────────────────────────────────────────
+  // 3. GameStore
   // constructor(address keyCoin_, address gameToken_)
   await verifyContract("GameStore", GameStore, [KeyCoin, GameToken], network);
 
-  // ── 4. ActivationContract ─────────────────────────────────────
+  // 4. ActivationContract
   // constructor(address gameToken_)
   await verifyContract("ActivationContract", ActivationContract, [GameToken], network);
 
-  // ── 5. Marketplace ────────────────────────────────────────────
+  // 5. Marketplace
   // constructor(address keyCoin_, address gameToken_, address activation_)
   await verifyContract(
     "Marketplace",
@@ -149,13 +147,12 @@ async function main() {
     network
   );
 
-  // ── 6. GamePass ───────────────────────────────────────────────
+  // 6. GamePass
   // constructor(address keyCoin_, address gameStore_)
   await verifyContract("GamePass", GamePass, [KeyCoin, GameStore], network);
 
-  // ── Tổng kết ──────────────────────────────────────────────────
-  console.log("\n━".repeat(55));
-  console.log("\n📋  Tất cả contracts trên Etherscan:\n");
+  // Summary
+  console.log("\nAll contracts on Etherscan:\n");
   for (const [name, address] of Object.entries(deployment)) {
     if (name === "network") continue;
     console.log(`  ${name.padEnd(22)} ${explorerUrl(network, address)}`);

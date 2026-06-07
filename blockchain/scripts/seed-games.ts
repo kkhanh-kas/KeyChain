@@ -1,17 +1,17 @@
 /**
- * KeyChain — seed-games.ts
+ * KeyChain - seed-games.ts
  * ========================
- * Nhiệm vụ chính:
- *   1. Đọc địa chỉ contracts từ deployments/<network>.json
- *   2. Dùng vendor wallet (từ VENDOR_PRIVATE_KEY hoặc deployer) registerGame()
- *      cho từng game trong danh sách SEED_GAMES
- *   3. Đăng ký GamePass (subscription) cho mỗi game nếu có monthlyPrice
- *   4. In catalog kết quả để xác nhận
+ * Tasks:
+ *   1. Read contract addresses from deployments/<network>.json
+ *   2. Use the vendor wallet (from VENDOR_PRIVATE_KEY or deployer) to
+ *      registerGame() for each game in SEED_GAMES
+ *   3. Register a GamePass (subscription) for each game that has a monthlyPrice
+ *   4. Print the resulting catalog for confirmation
  *
- * Yêu cầu trước khi chạy:
- *   - deploy.ts đã chạy xong
- *   - setup-roles.ts đã grant VENDOR_ROLE cho vendor wallet
- *   - Vendor wallet có đủ ETH để trả gas
+ * Prerequisites:
+ *   - deploy.ts has run
+ *   - setup-roles.ts has granted VENDOR_ROLE to the vendor wallet
+ *   - The vendor wallet has enough ETH for gas
  *
  * Usage:
  *   npx hardhat run scripts/seed-games.ts --network sepolia
@@ -23,111 +23,109 @@ import * as fs from "fs";
 import * as path from "path";
 import hre from "hardhat";
 
-// ─── Dữ liệu seed ──────────────────────────────────────────────────────────
+// --- Seed data ---
 
 /**
- * Danh sách game demo. Mỗi game sẽ được registerGame() trên GameStore.
+ * Demo game list. Each game is registered via registerGame() on GameStore.
  *
- * price: số KEY (18 decimals — dùng ethers.parseUnits)
- * royaltyBps: royalty thứ cấp tính bằng basis points (500 = 5%)
- * uri: IPFS CID metadata (JSON gồm name, description, image)
- * monthlyPrice: nếu > 0, registerPass() trên GamePass với giá này/tháng
+ * price: amount of KEY (18 decimals - use ethers.parseUnits)
+ * royaltyBps: secondary-market royalty in basis points (500 = 5%)
+ * uri: IPFS CID metadata (JSON with name, description, image)
+ * monthlyPrice: if > 0, registerPass() on GamePass with this price per month
  */
 const SEED_GAMES = [
   {
     name: "CryptoQuest",
     price: ethers.parseUnits("10", 18),      // 10 KEY
-    royaltyBps: 500,                          // 5% royalty thứ cấp
+    royaltyBps: 500,                          // 5% secondary royalty
     uri: "ipfs://QmCryptoQuestMetadataCIDHere",
-    monthlyPrice: ethers.parseUnits("3", 18), // 3 KEY/tháng
+    monthlyPrice: ethers.parseUnits("3", 18), // 3 KEY/month
   },
   {
     name: "BlockBrawl",
     price: ethers.parseUnits("25", 18),       // 25 KEY
     royaltyBps: 750,                          // 7.5%
     uri: "ipfs://QmBlockBrawlMetadataCIDHere",
-    monthlyPrice: ethers.parseUnits("5", 18), // 5 KEY/tháng
+    monthlyPrice: ethers.parseUnits("5", 18), // 5 KEY/month
   },
   {
     name: "NFT Racer",
     price: ethers.parseUnits("15", 18),       // 15 KEY
     royaltyBps: 300,                          // 3%
     uri: "ipfs://QmNFTRacerMetadataCIDHere",
-    monthlyPrice: BigInt(0),                  // không có subscription
+    monthlyPrice: BigInt(0),                  // no subscription
   },
   {
     name: "DeFi Dungeon",
-    price: ethers.parseUnits("50", 18),       // 50 KEY — premium game
+    price: ethers.parseUnits("50", 18),       // 50 KEY - premium game
     royaltyBps: 1000,                         // 10%
     uri: "ipfs://QmDeFiDungeonMetadataCIDHere",
-    monthlyPrice: ethers.parseUnits("8", 18), // 8 KEY/tháng
+    monthlyPrice: ethers.parseUnits("8", 18), // 8 KEY/month
   },
 ];
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// --- Helpers ---
 
 function loadDeployment(network: string): Record<string, string> {
   const filePath = path.join(__dirname, "..", "deployments", `${network}.json`);
   if (!fs.existsSync(filePath)) {
     throw new Error(
       `Deployment file not found: ${filePath}\n` +
-        `Hãy chạy deploy.ts trước: npm run deploy:${network}`
+        `Run deploy.ts first: npm run deploy:${network}`
     );
   }
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-// ─── Main ──────────────────────────────────────────────────────────────────
+// --- Main ---
 
 async function main() {
   const [deployer] = await ethers.getSigners();
   const network = hre.network.name;
 
-  console.log("━".repeat(55));
-  console.log(`  seed-games   |  network: ${network}`);
-  console.log(`  Vendor       |  ${deployer.address}`);
-  console.log("━".repeat(55));
+  console.log(`seed-games   |  network: ${network}`);
+  console.log(`Vendor       |  ${deployer.address}`);
 
-  // ── Load addresses ────────────────────────────────────────────────────────
+  // Load addresses
   const deployment = loadDeployment(network);
   const { GameStore: gameStoreAddr, GamePass: gamePassAddr } = deployment;
 
   if (!gameStoreAddr) throw new Error("GameStore address missing in deployment.");
   if (!gamePassAddr)  throw new Error("GamePass address missing in deployment.");
 
-  // ── Attach contracts ──────────────────────────────────────────────────────
+  // Attach contracts
   const GameStore = await ethers.getContractFactory("GameStore");
   const gameStore = GameStore.attach(gameStoreAddr) as any;
 
   const GamePass = await ethers.getContractFactory("GamePass");
   const gamePass = GamePass.attach(gamePassAddr) as any;
 
-  // ── Kiểm tra VENDOR_ROLE ──────────────────────────────────────────────────
+  // Check VENDOR_ROLE
   const VENDOR_ROLE = await gameStore.VENDOR_ROLE();
   const isVendor = await gameStore.hasRole(VENDOR_ROLE, deployer.address);
   if (!isVendor) {
     throw new Error(
-      `Địa chỉ ${deployer.address} chưa có VENDOR_ROLE.\n` +
-        `Chạy setup-roles.ts trước để grant role.`
+      `Address ${deployer.address} does not have VENDOR_ROLE.\n` +
+        `Run setup-roles.ts first to grant the role.`
     );
   }
 
-  // ── Register games ────────────────────────────────────────────────────────
-  console.log(`\n🎮  Đăng ký ${SEED_GAMES.length} games…\n`);
+  // Register games
+  console.log(`\nRegistering ${SEED_GAMES.length} games...\n`);
 
   const registeredGameIds: { name: string; gameId: bigint; hasPass: boolean }[] = [];
 
   for (const game of SEED_GAMES) {
-    process.stdout.write(`  ⏳  ${game.name.padEnd(16)}`);
+    process.stdout.write(`  ${game.name.padEnd(16)}`);
 
-    //Chạy staticCall để lấy thử gameId không tốn gas
+    // staticCall to read the gameId without spending gas
     const gameId: bigint = await gameStore.registerGame.staticCall(
       game.name,
       game.price,
       game.royaltyBps,
       game.uri
     );
- 
+
     const tx = await gameStore.registerGame(
       game.name,
       game.price,
@@ -135,39 +133,39 @@ async function main() {
       game.uri
     );
     await tx.wait();
- 
+
     registeredGameIds.push({ name: game.name, gameId, hasPass: game.monthlyPrice > 0n });
 
     console.log(
-      ` ✅  gameId=${gameId}  price=${ethers.formatUnits(game.price, 18)} KEY` +
+      ` gameId=${gameId}  price=${ethers.formatUnits(game.price, 18)} KEY` +
         `  royalty=${game.royaltyBps / 100}%`
     );
   }
 
-  // ── Register GamePass cho các game có monthlyPrice ────────────────────────
+  // Register GamePass for games that have a monthlyPrice
   const passGames = SEED_GAMES.filter((g) => g.monthlyPrice > 0n);
 
   if (passGames.length > 0) {
-    console.log(`\n🎫  Đăng ký GamePass cho ${passGames.length} game(s)…\n`);
+    console.log(`\nRegistering GamePass for ${passGames.length} game(s)...\n`);
 
     for (let i = 0; i < SEED_GAMES.length; i++) {
       const game = SEED_GAMES[i];
       if (game.monthlyPrice === 0n) continue;
 
       const gameId = i + 1;
-      process.stdout.write(`  ⏳  ${game.name.padEnd(16)}`);
+      process.stdout.write(`  ${game.name.padEnd(16)}`);
 
       const tx = await gamePass.registerPass(gameId, game.monthlyPrice);
       await tx.wait();
 
       console.log(
-        ` ✅  gameId=${gameId}  ${ethers.formatUnits(game.monthlyPrice, 18)} KEY/tháng`
+        ` gameId=${gameId}  ${ethers.formatUnits(game.monthlyPrice, 18)} KEY/month`
       );
     }
   }
 
-  // ── Xác nhận catalog trên chain ───────────────────────────────────────────
-  console.log("\n📋  Catalog trên chain:\n");
+  // Confirm the on-chain catalog
+  console.log("\nOn-chain catalog:\n");
   const [ids, infos] = await gameStore.getCatalog();
 
   for (let i = 0; i < ids.length; i++) {
@@ -177,11 +175,11 @@ async function main() {
       `  [${id}] ${info.name.padEnd(16)}` +
         `  price=${ethers.formatUnits(info.price, 18).padStart(6)} KEY` +
         `  listed=${info.isListed}` +
-        `  vendor=${info.vendorAddress.slice(0, 10)}…`
+        `  vendor=${info.vendorAddress.slice(0, 10)}...`
     );
   }
 
-  console.log("\n✅  seed-games hoàn thành.\n");
+  console.log("\nseed-games done.\n");
 }
 
 main().catch((err) => {
