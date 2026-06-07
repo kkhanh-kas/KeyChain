@@ -142,9 +142,16 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Local Agent 
+# Local Agent
 .claude/
 CLAUDE.md
 AGENTS.md
 docs/
-CONTEXT.md 
+CONTEXT.md
+
+# Hardhat (blockchain) generated files
+blockchain/artifacts/
+blockchain/cache/
+blockchain/typechain-types/
+blockchain/coverage/
+blockchain/coverage.json
