@@ -616,4 +616,33 @@ describe("Marketplace", () => {
       expect(listing.isOpen).to.be.true;
     });
   });
+
+  // -------------------------------------------------------------------------
+  // 6. ERC-1155 receiver
+  // -------------------------------------------------------------------------
+  describe("ERC-1155 receiver", () => {
+    it("advertises IERC1155Receiver support and accepts batch receipts", async () => {
+      const { marketplace, buyer } = await loadFixture(
+        deployMarketplaceFixture
+      );
+
+      const IERC1155_RECEIVER_ID = "0x4e2312e0";
+      const ERC165_ID = "0x01ffc9a7";
+      const BATCH_SELECTOR = "0xbc197c81"; // onERC1155BatchReceived selector
+
+      expect(await marketplace.supportsInterface(IERC1155_RECEIVER_ID)).to.be
+        .true;
+      expect(await marketplace.supportsInterface(ERC165_ID)).to.be.true;
+      expect(await marketplace.supportsInterface("0xffffffff")).to.be.false;
+      expect(
+        await marketplace.onERC1155BatchReceived(
+          buyer.address,
+          buyer.address,
+          [],
+          [],
+          "0x"
+        )
+      ).to.equal(BATCH_SELECTOR);
+    });
+  });
 });
