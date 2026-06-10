@@ -2,123 +2,116 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 
-import type {
-  KeyCoin,
-  GameToken,
-  GameStore,
-  GamePass,
-} from "../typechain-types";
+import type { KeyCoin, GameToken, GameStore, GamePass } from "../typechain-types";
 
-// Constants 
-const MONTH = 30n * 24n * 3600n;
-const INITIAL_RATE = 1000n;
-const MONTHLY_PRICE = ethers.parseEther("10");
-const GAME_ID = 1n;
-const GAME_ID_2 = 2n;
-const ROYALTY_BPS = 500n;
-const GAME_URI = "ipfs://QmTest";
-const GAME_NAME = "TestGame";
-const GAME_PRICE = ethers.parseEther("100");
-const LARGE_KEY = ethers.parseEther("1000");
-
-async function buyEnoughKey(keyCoin: KeyCoin, account: any) {
-  const ethNeeded = LARGE_KEY / INITIAL_RATE;
-  await keyCoin.connect(account).buyKeyCoin({ value: ethNeeded });
-}
-
-//  Fixture 
-async function deployGamePassFixture() {
-  const [deployer, vendor, subscriber, otherUser] = await ethers.getSigners();
-
-  const KeyCoinFactory = await ethers.getContractFactory("KeyCoin");
-  const keyCoin = (await KeyCoinFactory.connect(deployer).deploy(
-    INITIAL_RATE
-  )) as unknown as KeyCoin;
-  await keyCoin.waitForDeployment();
-
-  const GameTokenFactory = await ethers.getContractFactory("GameToken");
-  const gameToken = (await GameTokenFactory.connect(
-    deployer
-  ).deploy()) as unknown as GameToken;
-  await gameToken.waitForDeployment();
-
-  const GameStoreFactory = await ethers.getContractFactory("GameStore");
-  const gameStore = (await GameStoreFactory.connect(deployer).deploy(
-    await keyCoin.getAddress(),
-    await gameToken.getAddress()
-  )) as unknown as GameStore;
-  await gameStore.waitForDeployment();
-
-  const GamePassFactory = await ethers.getContractFactory("GamePass");
-  const gamePass = (await GamePassFactory.connect(deployer).deploy(
-    await keyCoin.getAddress(),
-    await gameStore.getAddress()
-  )) as unknown as GamePass;
-  await gamePass.waitForDeployment();
-
-  const MINTER_ROLE = await gameToken.MINTER_ROLE();
-  const VENDOR_ROLE = await gameStore.VENDOR_ROLE();
-
-  await gameToken
-    .connect(deployer)
-    .grantRole(MINTER_ROLE, await gameStore.getAddress());
-
-  await gameStore.connect(deployer).grantRole(VENDOR_ROLE, vendor.address);
-
-  await gameStore
-    .connect(vendor)
-    .registerGame(GAME_NAME, GAME_PRICE, ROYALTY_BPS, GAME_URI);
-
-  await gamePass.connect(vendor).registerPass(GAME_ID, MONTHLY_PRICE);
-
-  await buyEnoughKey(keyCoin, subscriber);
-
-  await keyCoin
-    .connect(subscriber)
-    .approve(await gamePass.getAddress(), ethers.MaxUint256);
-
-  return {
-    deployer,
-    vendor,
-    subscriber,
-    otherUser,
-    keyCoin,
-    gameToken,
-    gameStore,
-    gamePass,
-  };
-}
-
-// Tests 
+// GamePass — fixed-duration subscription licenses priced in KEY.
+// One subscribe(gameId, months) handles first-time, early renewal (stacking),
+// and lapsed renewal via expiry = max(currentExpiry, now) + months * MONTH.
 describe("GamePass", () => {
-  describe("Deployment", () => {
-    it("stores the correct KeyCoin address", async () => {
+  const MONTH = 30n * 24n * 3600n; // 30 days in seconds
+  const INITIAL_RATE = 1000n;
+  const MONTHLY_PRICE = ethers.parseEther("10");
+  const GAME_ID = 1n;
+  const GAME_ID_2 = 2n;
+  const ROYALTY_BPS = 500n;
+  const GAME_URI = "ipfs://QmTest";
+  const GAME_NAME = "TestGame";
+  const GAME_PRICE = ethers.parseEther("100");
+  const LARGE_KEY = ethers.parseEther("1000");
+
+  // Helper: fund an account with enough KEY to cover any subscription in these tests.
+  async function buyEnoughKey(keyCoin: KeyCoin, account: any) {
+    const ethNeeded = LARGE_KEY / INITIAL_RATE;
+    await keyCoin.connect(account).buyKeyCoin({ value: ethNeeded });
+  }
+
+  async function deployGamePassFixture() {
+    const [deployer, vendor, subscriber, otherUser] = await ethers.getSigners();
+
+    const KeyCoinFactory = await ethers.getContractFactory("KeyCoin");
+    const keyCoin = (await KeyCoinFactory.connect(deployer).deploy(
+      INITIAL_RATE
+    )) as unknown as KeyCoin;
+    await keyCoin.waitForDeployment();
+
+    const GameTokenFactory = await ethers.getContractFactory("GameToken");
+    const gameToken = (await GameTokenFactory.connect(
+      deployer
+    ).deploy()) as unknown as GameToken;
+    await gameToken.waitForDeployment();
+
+    const GameStoreFactory = await ethers.getContractFactory("GameStore");
+    const gameStore = (await GameStoreFactory.connect(deployer).deploy(
+      await keyCoin.getAddress(),
+      await gameToken.getAddress()
+    )) as unknown as GameStore;
+    await gameStore.waitForDeployment();
+
+    const GamePassFactory = await ethers.getContractFactory("GamePass");
+    const gamePass = (await GamePassFactory.connect(deployer).deploy(
+      await keyCoin.getAddress(),
+      await gameStore.getAddress()
+    )) as unknown as GamePass;
+    await gamePass.waitForDeployment();
+
+    // Wiring: store mints licenses, vendor registers a game then a pass for it.
+    const MINTER_ROLE = await gameToken.MINTER_ROLE();
+    const VENDOR_ROLE = await gameStore.VENDOR_ROLE();
+    await gameToken
+      .connect(deployer)
+      .grantRole(MINTER_ROLE, await gameStore.getAddress());
+    await gameStore.connect(deployer).grantRole(VENDOR_ROLE, vendor.address);
+    await gameStore
+      .connect(vendor)
+      .registerGame(GAME_NAME, GAME_PRICE, ROYALTY_BPS, GAME_URI);
+    await gamePass.connect(vendor).registerPass(GAME_ID, MONTHLY_PRICE);
+
+    // Subscriber pre-funded and approves GamePass to pull KEY.
+    await buyEnoughKey(keyCoin, subscriber);
+    await keyCoin
+      .connect(subscriber)
+      .approve(await gamePass.getAddress(), ethers.MaxUint256);
+
+    return {
+      deployer,
+      vendor,
+      subscriber,
+      otherUser,
+      keyCoin,
+      gameToken,
+      gameStore,
+      gamePass,
+    };
+  }
+
+  describe("deployment", () => {
+    it("stores the KeyCoin address it was constructed with", async () => {
       const { keyCoin, gamePass } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.keyCoin()).to.equal(await keyCoin.getAddress());
     });
 
-    it("stores the correct GameStore address", async () => {
+    it("stores the GameStore address it was constructed with", async () => {
       const { gameStore, gamePass } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.gameStore()).to.equal(await gameStore.getAddress());
     });
 
-    it("exposes MONTH constant equal to 30 days", async () => {
+    it("exposes MONTH as 30 days", async () => {
       const { gamePass } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.MONTH()).to.equal(MONTH);
     });
 
-    it("returns 0 expiry before subscription", async () => {
+    it("returns zero expiry before any subscription", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.expiryOf(subscriber.address, GAME_ID)).to.equal(0n);
     });
   });
 
-  describe("registerPass()", () => {
-    it("allows the game vendor to register a pass", async () => {
+  describe("registerPass", () => {
+    it("lets the game vendor register a pass", async () => {
       const { gameStore, gamePass, vendor } = await loadFixture(
         deployGamePassFixture
       );
@@ -132,25 +125,22 @@ describe("GamePass", () => {
       ).to.not.be.reverted;
     });
 
-    it("updates monthly price when vendor registers the same pass again", async () => {
+    it("updates the monthly price when the vendor re-registers the same pass", async () => {
       const { gamePass, keyCoin, vendor, subscriber } = await loadFixture(
         deployGamePassFixture
       );
 
       const newMonthlyPrice = ethers.parseEther("15");
-
       await gamePass.connect(vendor).registerPass(GAME_ID, newMonthlyPrice);
 
       const vendorBefore = await keyCoin.balanceOf(vendor.address);
-
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
-
       const vendorAfter = await keyCoin.balanceOf(vendor.address);
 
       expect(vendorAfter - vendorBefore).to.equal(newMonthlyPrice);
     });
 
-    it("reverts when a non-vendor tries to registerPass", async () => {
+    it("reverts when a non-vendor tries to register a pass", async () => {
       const { gamePass, otherUser } = await loadFixture(deployGamePassFixture);
 
       await expect(
@@ -158,7 +148,7 @@ describe("GamePass", () => {
       ).to.be.revertedWith("GamePass: not game vendor");
     });
 
-    it("reverts when subscriber tries to registerPass", async () => {
+    it("reverts when a subscriber tries to register a pass", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await expect(
@@ -166,7 +156,7 @@ describe("GamePass", () => {
       ).to.be.revertedWith("GamePass: not game vendor");
     });
 
-    it("allows monthlyPrice = 0 because contract has no price guard", async () => {
+    it("allows monthlyPrice = 0 because the contract has no price guard", async () => {
       const { gamePass, vendor } = await loadFixture(deployGamePassFixture);
 
       await expect(gamePass.connect(vendor).registerPass(GAME_ID, 0n)).to.not.be
@@ -174,15 +164,15 @@ describe("GamePass", () => {
     });
   });
 
-  describe("subscribe()", () => {
-    it("allows subscriber to subscribe for 1 month", async () => {
+  describe("subscribe", () => {
+    it("subscribes for a single month", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await expect(gamePass.connect(subscriber).subscribe(GAME_ID, 1n)).to.not.be
         .reverted;
     });
 
-    it("sets expiry greater than current block timestamp", async () => {
+    it("sets expiry ahead of the current block timestamp", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       const beforeSubscribe = await time.latest();
@@ -190,11 +180,10 @@ describe("GamePass", () => {
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
 
       const expiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
-
       expect(expiry).to.be.greaterThan(BigInt(beforeSubscribe));
     });
 
-    it("transfers monthlyPrice * months KEY from subscriber to vendor", async () => {
+    it("charges months * monthlyPrice from subscriber to vendor", async () => {
       const { gamePass, keyCoin, subscriber, vendor } = await loadFixture(
         deployGamePassFixture
       );
@@ -214,7 +203,7 @@ describe("GamePass", () => {
       expect(subscriberBefore - subscriberAfter).to.equal(expectedCost);
     });
 
-    it("emits PassSubscribed with correct arguments", async () => {
+    it("emits PassSubscribed with the gameId, subscriber, months and expiry", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       const months = 2n;
@@ -228,7 +217,7 @@ describe("GamePass", () => {
         .withArgs(GAME_ID, subscriber.address, months, expectedExpiry);
     });
 
-    it("reverts when months = 0", async () => {
+    it("reverts when months is 0", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await expect(
@@ -236,7 +225,7 @@ describe("GamePass", () => {
       ).to.be.revertedWith("GamePass: months out of range");
     });
 
-    it("reverts when months > 12", async () => {
+    it("reverts when months exceeds 12", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await expect(
@@ -247,11 +236,11 @@ describe("GamePass", () => {
     it("allows subscribing for exactly 12 months", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
-      await expect(gamePass.connect(subscriber).subscribe(GAME_ID, 12n)).to.not
-        .be.reverted;
+      await expect(gamePass.connect(subscriber).subscribe(GAME_ID, 12n)).to.not.be
+        .reverted;
     });
 
-    it("reverts when pass is not registered", async () => {
+    it("reverts when the pass is not registered", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await expect(
@@ -259,11 +248,12 @@ describe("GamePass", () => {
       ).to.be.revertedWith("GamePass: pass not registered");
     });
 
-    it("reverts when subscriber has insufficient KEY balance", async () => {
+    it("reverts when the subscriber has insufficient KEY balance", async () => {
       const { gamePass, keyCoin, otherUser } = await loadFixture(
         deployGamePassFixture
       );
 
+      // otherUser approves but never bought KEY.
       await keyCoin
         .connect(otherUser)
         .approve(await gamePass.getAddress(), ethers.MaxUint256);
@@ -272,11 +262,12 @@ describe("GamePass", () => {
         .reverted;
     });
 
-    it("reverts when subscriber has not approved GamePass to spend KEY", async () => {
+    it("reverts when the subscriber has not approved GamePass to spend KEY", async () => {
       const { gamePass, keyCoin, otherUser } = await loadFixture(
         deployGamePassFixture
       );
 
+      // otherUser holds KEY but skips approve.
       await buyEnoughKey(keyCoin, otherUser);
 
       await expect(gamePass.connect(otherUser).subscribe(GAME_ID, 1n)).to.be
@@ -284,8 +275,8 @@ describe("GamePass", () => {
     });
   });
 
-  describe("Renew while subscription is active", () => {
-    it("extends expiry from current expiry", async () => {
+  describe("renewing while the subscription is active", () => {
+    it("stacks onto the existing expiry", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
@@ -297,7 +288,7 @@ describe("GamePass", () => {
       expect(secondExpiry).to.equal(firstExpiry + MONTH);
     });
 
-    it("state: No subscription → Active → Renew while active", async () => {
+    it("stacks even after time passes while still subscribed", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.expiryOf(subscriber.address, GAME_ID)).to.equal(0n);
@@ -305,7 +296,7 @@ describe("GamePass", () => {
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
       const firstExpiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
 
-      await time.increase(15 * 24 * 3600);
+      await time.increase(15 * 24 * 3600); // 15 days, still subscribed
 
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
       const secondExpiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
@@ -314,15 +305,14 @@ describe("GamePass", () => {
     });
   });
 
-  describe("Renew after subscription has expired", () => {
-    it("renews from block.timestamp after expiry", async () => {
+  describe("renewing after the subscription has expired", () => {
+    it("starts fresh from the current block timestamp", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
       const firstExpiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
 
-      await time.increase(Number(MONTH + 1n));
-
+      await time.increase(Number(MONTH + 1n)); // pass has lapsed
       expect(firstExpiry).to.be.lessThan(BigInt(await time.latest()));
 
       const tx = await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
@@ -330,11 +320,10 @@ describe("GamePass", () => {
       const block = await ethers.provider.getBlock(receipt!.blockNumber);
 
       const secondExpiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
-
       expect(secondExpiry).to.equal(BigInt(block!.timestamp) + MONTH);
     });
 
-    it("allows multiple subscribe cycles after expiry", async () => {
+    it("allows multiple subscribe cycles across expiries", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
@@ -345,25 +334,24 @@ describe("GamePass", () => {
 
       const expiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
       const now = await time.latest();
-
       expect(expiry).to.be.greaterThan(BigInt(now));
     });
   });
 
-  describe("expiryOf()", () => {
-    it("returns 0 before any subscription", async () => {
+  describe("expiryOf", () => {
+    it("returns zero before any subscription", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.expiryOf(subscriber.address, GAME_ID)).to.equal(0n);
     });
 
-    it("returns 0 for an address that never subscribed", async () => {
+    it("returns zero for an address that never subscribed", async () => {
       const { gamePass, otherUser } = await loadFixture(deployGamePassFixture);
 
       expect(await gamePass.expiryOf(otherUser.address, GAME_ID)).to.equal(0n);
     });
 
-    it("returns exact expiry after subscribing for 1 month", async () => {
+    it("returns the exact expiry one month ahead after a single-month subscribe", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       const tx = await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
@@ -371,25 +359,22 @@ describe("GamePass", () => {
       const block = await ethers.provider.getBlock(receipt!.blockNumber);
 
       const expiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
-
       expect(expiry).to.equal(BigInt(block!.timestamp) + MONTH);
     });
 
-    it("returns exact expiry after subscribing for multiple months", async () => {
+    it("returns the exact expiry months ahead after a multi-month subscribe", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       const months = 6n;
-
       const tx = await gamePass.connect(subscriber).subscribe(GAME_ID, months);
       const receipt = await tx.wait();
       const block = await ethers.provider.getBlock(receipt!.blockNumber);
 
       const expiry = await gamePass.expiryOf(subscriber.address, GAME_ID);
-
       expect(expiry).to.equal(BigInt(block!.timestamp) + months * MONTH);
     });
 
-    it("updates correctly after renewal", async () => {
+    it("updates after renewal", async () => {
       const { gamePass, subscriber } = await loadFixture(deployGamePassFixture);
 
       await gamePass.connect(subscriber).subscribe(GAME_ID, 1n);
@@ -418,7 +403,10 @@ describe("GamePass", () => {
         subscriber.address,
         GAME_ID
       );
-      const otherUserExpiry = await gamePass.expiryOf(otherUser.address, GAME_ID);
+      const otherUserExpiry = await gamePass.expiryOf(
+        otherUser.address,
+        GAME_ID
+      );
 
       expect(otherUserExpiry).to.be.greaterThan(subscriberExpiry);
     });

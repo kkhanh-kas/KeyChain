@@ -2,78 +2,62 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 
-import type {
-  ActivationContract,
-  GameToken,
-} from "../typechain-types";
+import type { ActivationContract, GameToken } from "../typechain-types";
 
-// ---------------------------------------------------------------------------
-// Fixture
-// ---------------------------------------------------------------------------
-
-async function deployActivationFixture() {
-  const [deployer, vendor, player, otherPlayer] = await ethers.getSigners();
-
-  // 1. Deploy GameToken
-  const GameTokenFactory = await ethers.getContractFactory("GameToken");
-  const gameToken = (await GameTokenFactory.connect(
-    deployer
-  ).deploy()) as unknown as GameToken;
-  await gameToken.waitForDeployment();
-
-  // 2. Deploy ActivationContract
-  const ActivationFactory = await ethers.getContractFactory("ActivationContract");
-  const activation = (await ActivationFactory.connect(deployer).deploy(
-    await gameToken.getAddress()
-  )) as unknown as ActivationContract;
-  await activation.waitForDeployment();
-
-  // 3. Grant MINTER_ROLE to deployer for isolated unit testing.
-  //    In production, GameStore should hold MINTER_ROLE.
-  const MINTER_ROLE = await gameToken.MINTER_ROLE();
-  await gameToken.connect(deployer).grantRole(MINTER_ROLE, deployer.address);
-
-  // 4. Create a game.
-  const TOKEN_ID = 1n;
-  await gameToken
-    .connect(deployer)
-    .createGame(TOKEN_ID, vendor.address, 500n, "ipfs://game-metadata-cid");
-
-  // 5. Mint one license to player.
-  await gameToken.connect(deployer).mint(player.address, TOKEN_ID);
-
-  // Machine hashes used for activation tests.
-  const MACHINE_HASH_1 = ethers.keccak256(
-    ethers.toUtf8Bytes("machine-001")
-  ) as `0x${string}`;
-
-  const MACHINE_HASH_2 = ethers.keccak256(
-    ethers.toUtf8Bytes("machine-002")
-  ) as `0x${string}`;
-
-  return {
-    deployer,
-    vendor,
-    player,
-    otherPlayer,
-    gameToken,
-    activation,
-    TOKEN_ID,
-    MACHINE_HASH_1,
-    MACHINE_HASH_2,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
+// ActivationContract — binds a license to a device via machineHash.
+// Once activated, a license cannot be resold until deactivated; activation
+// state is scoped per (owner, tokenId) pair.
 describe("ActivationContract", () => {
-  // -------------------------------------------------------------------------
-  // 1. Deployment
-  // -------------------------------------------------------------------------
-  describe("Deployment", () => {
-    it("stores the correct GameToken address", async () => {
+  async function deployActivationFixture() {
+    const [deployer, vendor, player, otherPlayer] = await ethers.getSigners();
+
+    const GameTokenFactory = await ethers.getContractFactory("GameToken");
+    const gameToken = (await GameTokenFactory.connect(
+      deployer
+    ).deploy()) as unknown as GameToken;
+    await gameToken.waitForDeployment();
+
+    const ActivationFactory = await ethers.getContractFactory("ActivationContract");
+    const activation = (await ActivationFactory.connect(deployer).deploy(
+      await gameToken.getAddress()
+    )) as unknown as ActivationContract;
+    await activation.waitForDeployment();
+
+    // Grant MINTER_ROLE to deployer so the fixture can mint directly.
+    // In production GameStore holds MINTER_ROLE.
+    const MINTER_ROLE = await gameToken.MINTER_ROLE();
+    await gameToken.connect(deployer).grantRole(MINTER_ROLE, deployer.address);
+
+    // Create a game and give the player one license unit to activate.
+    const TOKEN_ID = 1n;
+    await gameToken
+      .connect(deployer)
+      .createGame(TOKEN_ID, vendor.address, 500n, "ipfs://game-metadata-cid");
+    await gameToken.connect(deployer).mint(player.address, TOKEN_ID);
+
+    // Machine hashes standing in for two distinct devices.
+    const MACHINE_HASH_1 = ethers.keccak256(
+      ethers.toUtf8Bytes("machine-001")
+    ) as `0x${string}`;
+    const MACHINE_HASH_2 = ethers.keccak256(
+      ethers.toUtf8Bytes("machine-002")
+    ) as `0x${string}`;
+
+    return {
+      deployer,
+      vendor,
+      player,
+      otherPlayer,
+      gameToken,
+      activation,
+      TOKEN_ID,
+      MACHINE_HASH_1,
+      MACHINE_HASH_2,
+    };
+  }
+
+  describe("deployment", () => {
+    it("stores the GameToken address it was constructed with", async () => {
       const { activation, gameToken } = await loadFixture(
         deployActivationFixture
       );
@@ -88,84 +72,77 @@ describe("ActivationContract", () => {
         deployActivationFixture
       );
 
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.false;
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(false);
     });
 
-    it("getLicense returns a zeroed struct before activation", async () => {
+    it("returns a zeroed license struct before activation", async () => {
       const { activation, player, TOKEN_ID } = await loadFixture(
         deployActivationFixture
       );
 
       const info = await activation.getLicense(player.address, TOKEN_ID);
 
-      expect(info.isActive).to.be.false;
+      expect(info.isActive).to.equal(false);
       expect(info.hardwareHash).to.equal(ethers.ZeroHash);
       expect(info.activatedAt).to.equal(0n);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 2. activateLicense()
-  // -------------------------------------------------------------------------
-  describe("activateLicense()", () => {
-    it("succeeds when caller owns the ERC-1155 license", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+  describe("activateLicense", () => {
+    it("succeeds when the caller owns the ERC-1155 license", async () => {
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
       await expect(
         activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1)
       ).to.not.be.reverted;
     });
 
-    it("sets isActive to true after activation", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+    it("marks the license active after activation", async () => {
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.true;
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(true);
     });
 
-    it("getLicense returns correct data after activation", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+    it("records hardwareHash and a fresh activatedAt timestamp", async () => {
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
       const txTimestamp = await time.latest();
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
       const info = await activation.getLicense(player.address, TOKEN_ID);
 
-      expect(info.isActive).to.be.true;
+      expect(info.isActive).to.equal(true);
       expect(info.hardwareHash).to.equal(MACHINE_HASH_1);
       expect(info.activatedAt).to.be.greaterThan(BigInt(txTimestamp));
     });
 
     it("stores the exact machineHash passed by the caller", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_2 } =
-        await loadFixture(deployActivationFixture);
+      const { activation, player, TOKEN_ID, MACHINE_HASH_2 } = await loadFixture(
+        deployActivationFixture
+      );
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_2);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_2);
 
       const info = await activation.getLicense(player.address, TOKEN_ID);
 
       expect(info.hardwareHash).to.equal(MACHINE_HASH_2);
     });
 
-    it("reverts when caller does not own the license", async () => {
+    it("reverts when the caller does not own the license", async () => {
       const { activation, otherPlayer, TOKEN_ID, MACHINE_HASH_1 } =
         await loadFixture(deployActivationFixture);
 
       await expect(
-        activation
-          .connect(otherPlayer)
-          .activateLicense(TOKEN_ID, MACHINE_HASH_1)
+        activation.connect(otherPlayer).activateLicense(TOKEN_ID, MACHINE_HASH_1)
       ).to.be.revertedWith("Activation: not license owner");
     });
 
@@ -173,9 +150,7 @@ describe("ActivationContract", () => {
       const { activation, player, TOKEN_ID, MACHINE_HASH_1, MACHINE_HASH_2 } =
         await loadFixture(deployActivationFixture);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
       await expect(
         activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_2)
@@ -193,48 +168,43 @@ describe("ActivationContract", () => {
         MACHINE_HASH_1,
       } = await loadFixture(deployActivationFixture);
 
+      // Give a second owner the same title; activating one must not touch the other.
       await gameToken.connect(deployer).mint(otherPlayer.address, TOKEN_ID);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.true;
-      expect(await activation.isActive(otherPlayer.address, TOKEN_ID)).to.be
-        .false;
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(true);
+      expect(await activation.isActive(otherPlayer.address, TOKEN_ID)).to.equal(
+        false
+      );
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 3. deactivateLicense()
-  // -------------------------------------------------------------------------
-  describe("deactivateLicense()", () => {
-    it("succeeds when caller has an active license", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+  describe("deactivateLicense", () => {
+    it("succeeds when the caller has an active license", async () => {
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
-      await expect(activation.connect(player).deactivateLicense(TOKEN_ID)).to
-        .not.be.reverted;
+      await expect(activation.connect(player).deactivateLicense(TOKEN_ID)).to.not
+        .be.reverted;
     });
 
-    it("sets isActive to false after deactivation", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+    it("marks the license inactive so it can be resold again", async () => {
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
       await activation.connect(player).deactivateLicense(TOKEN_ID);
 
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.false;
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(false);
     });
 
-    it("reverts when the license is already inactive", async () => {
+    it("reverts when the license is not active", async () => {
       const { activation, player, TOKEN_ID } = await loadFixture(
         deployActivationFixture
       );
@@ -245,13 +215,11 @@ describe("ActivationContract", () => {
     });
 
     it("reverts on double deactivation", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
-
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
       await activation.connect(player).deactivateLicense(TOKEN_ID);
 
       await expect(
@@ -263,52 +231,40 @@ describe("ActivationContract", () => {
       const { activation, player, TOKEN_ID, MACHINE_HASH_1, MACHINE_HASH_2 } =
         await loadFixture(deployActivationFixture);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
-
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
       await activation.connect(player).deactivateLicense(TOKEN_ID);
-
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_2);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_2);
 
       const info = await activation.getLicense(player.address, TOKEN_ID);
 
-      expect(info.isActive).to.be.true;
+      expect(info.isActive).to.equal(true);
       expect(info.hardwareHash).to.equal(MACHINE_HASH_2);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 4. Ownership verification
-  // -------------------------------------------------------------------------
-  describe("Ownership verification", () => {
+  describe("ownership verification", () => {
     it("rejects activation from an address without the license", async () => {
       const { activation, otherPlayer, TOKEN_ID, MACHINE_HASH_1 } =
         await loadFixture(deployActivationFixture);
 
       await expect(
-        activation
-          .connect(otherPlayer)
-          .activateLicense(TOKEN_ID, MACHINE_HASH_1)
+        activation.connect(otherPlayer).activateLicense(TOKEN_ID, MACHINE_HASH_1)
       ).to.be.revertedWith("Activation: not license owner");
     });
 
-    it("does not allow another address to deactivate player's activation record", async () => {
+    it("does not let another address deactivate the player's record", async () => {
       const { activation, player, otherPlayer, TOKEN_ID, MACHINE_HASH_1 } =
         await loadFixture(deployActivationFixture);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
+      // otherPlayer has no active record of their own, so deactivate reverts.
       await expect(
         activation.connect(otherPlayer).deactivateLicense(TOKEN_ID)
       ).to.be.revertedWith("Activation: not active");
     });
 
-    it("keeps activation state independent per (owner, tokenId) pair", async () => {
+    it("keeps state independent per (owner, tokenId) pair", async () => {
       const {
         deployer,
         activation,
@@ -322,10 +278,7 @@ describe("ActivationContract", () => {
 
       await gameToken.connect(deployer).mint(otherPlayer.address, TOKEN_ID);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
-
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
       await activation
         .connect(otherPlayer)
         .activateLicense(TOKEN_ID, MACHINE_HASH_2);
@@ -340,7 +293,7 @@ describe("ActivationContract", () => {
       expect(otherInfo.hardwareHash).to.equal(MACHINE_HASH_2);
     });
 
-    it("keeps activation state independent across different tokenIds", async () => {
+    it("keeps state independent across different tokenIds", async () => {
       const {
         deployer,
         activation,
@@ -357,64 +310,55 @@ describe("ActivationContract", () => {
       await gameToken
         .connect(deployer)
         .createGame(TOKEN_ID_2, vendor.address, 300n, "ipfs://game2-cid");
-
       await gameToken.connect(deployer).mint(player.address, TOKEN_ID_2);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.true;
-      expect(await activation.isActive(player.address, TOKEN_ID_2)).to.be.false;
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(true);
+      expect(await activation.isActive(player.address, TOKEN_ID_2)).to.equal(
+        false
+      );
 
       await activation
         .connect(player)
         .activateLicense(TOKEN_ID_2, MACHINE_HASH_2);
 
-      expect(await activation.isActive(player.address, TOKEN_ID_2)).to.be.true;
+      expect(await activation.isActive(player.address, TOKEN_ID_2)).to.equal(
+        true
+      );
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 5. State-machine transitions
-  // -------------------------------------------------------------------------
-  describe("State-machine transitions", () => {
-    it("runs full lifecycle: Inactive → Active → Inactive → Active", async () => {
+  describe("state-machine transitions", () => {
+    it("runs the full lifecycle: Inactive → Active → Inactive → Active", async () => {
       const { activation, player, TOKEN_ID, MACHINE_HASH_1, MACHINE_HASH_2 } =
         await loadFixture(deployActivationFixture);
 
-      // Step 1: Owned but inactive.
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.false;
+      // Owned but inactive.
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(false);
 
-      // Step 2: Activate on the first machine.
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
-
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.true;
+      // Activate on the first machine.
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(true);
 
       let info = await activation.getLicense(player.address, TOKEN_ID);
-      expect(info.isActive).to.be.true;
+      expect(info.isActive).to.equal(true);
       expect(info.hardwareHash).to.equal(MACHINE_HASH_1);
       expect(info.activatedAt).to.be.greaterThan(0n);
 
-      // Step 3: Deactivate.
+      // Deactivate.
       await activation.connect(player).deactivateLicense(TOKEN_ID);
-
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.false;
-
-      info = await activation.getLicense(player.address, TOKEN_ID);
-      expect(info.isActive).to.be.false;
-
-      // Step 4: Reactivate on another machine.
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_2);
-
-      expect(await activation.isActive(player.address, TOKEN_ID)).to.be.true;
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(false);
 
       info = await activation.getLicense(player.address, TOKEN_ID);
-      expect(info.isActive).to.be.true;
+      expect(info.isActive).to.equal(false);
+
+      // Reactivate on another machine.
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_2);
+      expect(await activation.isActive(player.address, TOKEN_ID)).to.equal(true);
+
+      info = await activation.getLicense(player.address, TOKEN_ID);
+      expect(info.isActive).to.equal(true);
       expect(info.hardwareHash).to.equal(MACHINE_HASH_2);
     });
 
@@ -422,9 +366,7 @@ describe("ActivationContract", () => {
       const { activation, player, TOKEN_ID, MACHINE_HASH_1, MACHINE_HASH_2 } =
         await loadFixture(deployActivationFixture);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
 
       await expect(
         activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_2)
@@ -432,13 +374,11 @@ describe("ActivationContract", () => {
     });
 
     it("does not allow deactivation twice", async () => {
-      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } =
-        await loadFixture(deployActivationFixture);
+      const { activation, player, TOKEN_ID, MACHINE_HASH_1 } = await loadFixture(
+        deployActivationFixture
+      );
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
-
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
       await activation.connect(player).deactivateLicense(TOKEN_ID);
 
       await expect(
@@ -446,28 +386,24 @@ describe("ActivationContract", () => {
       ).to.be.revertedWith("Activation: not active");
     });
 
-    it("updates activatedAt on each new activation", async () => {
+    it("advances activatedAt on each new activation", async () => {
       const { activation, player, TOKEN_ID, MACHINE_HASH_1, MACHINE_HASH_2 } =
         await loadFixture(deployActivationFixture);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_1);
-
-      const firstInfo = await activation.getLicense(player.address, TOKEN_ID);
-      const firstActivatedAt = firstInfo.activatedAt;
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_1);
+      const firstActivatedAt = (
+        await activation.getLicense(player.address, TOKEN_ID)
+      ).activatedAt;
 
       await activation.connect(player).deactivateLicense(TOKEN_ID);
-
       await time.increase(60);
+      await activation.connect(player).activateLicense(TOKEN_ID, MACHINE_HASH_2);
 
-      await activation
-        .connect(player)
-        .activateLicense(TOKEN_ID, MACHINE_HASH_2);
+      const secondActivatedAt = (
+        await activation.getLicense(player.address, TOKEN_ID)
+      ).activatedAt;
 
-      const secondInfo = await activation.getLicense(player.address, TOKEN_ID);
-
-      expect(secondInfo.activatedAt).to.be.greaterThan(firstActivatedAt);
+      expect(secondActivatedAt).to.be.greaterThan(firstActivatedAt);
     });
   });
 });

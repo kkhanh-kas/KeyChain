@@ -9,160 +9,141 @@ import type {
   Marketplace,
 } from "../typechain-types";
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const TOKEN_ID = 1n;
-const ROYALTY_BPS = 1000n; // 10 %
-const KEY_RATE = 1n; // 1 KEY per wei (simplifies arithmetic in tests)
-
-function buildMachineHash(value: string): `0x${string}` {
-  return ethers.keccak256(ethers.toUtf8Bytes(value)) as `0x${string}`;
-}
-
-// ---------------------------------------------------------------------------
-// Fixture
-// ---------------------------------------------------------------------------
-
-async function deployMarketplaceFixture() {
-  const [deployer, vendor, seller, buyer, otherUser] =
-    await ethers.getSigners();
-
-  // 1. KeyCoin 
-  const KeyCoinFactory = await ethers.getContractFactory("KeyCoin");
-  const keyCoin = (await KeyCoinFactory.connect(deployer).deploy(
-    KEY_RATE
-  )) as unknown as KeyCoin;
-  await keyCoin.waitForDeployment();
-
-  //  2. GameToken 
-  const GameTokenFactory = await ethers.getContractFactory("GameToken");
-  const gameToken = (await GameTokenFactory.connect(
-    deployer
-  ).deploy()) as unknown as GameToken;
-  await gameToken.waitForDeployment();
-
-  //  3. ActivationContract 
-  const ActivationFactory = await ethers.getContractFactory("ActivationContract");
-  const activation = (await ActivationFactory.connect(deployer).deploy(
-    await gameToken.getAddress()
-  )) as unknown as ActivationContract;
-  await activation.waitForDeployment();
-
-  //  4. Marketplace  
-  const MarketplaceFactory = await ethers.getContractFactory("Marketplace");
-  const marketplace = (await MarketplaceFactory.connect(deployer).deploy(
-    await keyCoin.getAddress(),
-    await gameToken.getAddress(),
-    await activation.getAddress()
-  )) as unknown as Marketplace;
-  await marketplace.waitForDeployment();
-
-  //  5. Grant MINTER_ROLE to deployer for direct mint in tests 
-  const MINTER_ROLE = await gameToken.MINTER_ROLE();
-  await gameToken.connect(deployer).grantRole(MINTER_ROLE, deployer.address);
-
-  //  6. Create game (tokenId=1, vendor, 10% royalty) 
-  await gameToken
-    .connect(deployer)
-    .createGame(TOKEN_ID, vendor.address, ROYALTY_BPS, "ipfs://game-1");
-
-  //  7. Mint one license to seller 
-  await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
-
-  //  8. Fund buyer with KEY via buyKeyCoin() 
-  //    rate=1 → send 10_000 wei → buyer receives 10_000 KEY units
-  const BUYER_KEY = 10_000n;
-  await keyCoin.connect(buyer).buyKeyCoin({ value: BUYER_KEY });
-
-  //  9. Buyer approves Marketplace to spend KEY 
-  await keyCoin
-    .connect(buyer)
-    .approve(await marketplace.getAddress(), ethers.MaxUint256);
-
-  //  10. Seller approves Marketplace to transfer ERC-1155 
-  await gameToken
-    .connect(seller)
-    .setApprovalForAll(await marketplace.getAddress(), true);
-
-  return {
-    deployer,
-    vendor,
-    seller,
-    buyer,
-    otherUser,
-    keyCoin,
-    gameToken,
-    activation,
-    marketplace,
-    MINTER_ROLE,
-    BUYER_KEY,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
+// Marketplace — secondary market with automatic ERC-2981 royalty split.
+// A license must be inactive to be listed; listing escrows the unit. Buying
+// splits payment royalty→vendor, remainder→seller, and transfers the license.
 describe("Marketplace", () => {
-  // -------------------------------------------------------------------------
-  // 1. Deployment
-  // -------------------------------------------------------------------------
-  describe("Deployment", () => {
-    it("stores the correct KeyCoin address", async () => {
+  const TOKEN_ID = 1n;
+  const ROYALTY_BPS = 1000n; // 10%
+  const KEY_RATE = 1n; // 1 KEY per wei keeps the arithmetic in tests simple
+
+  // Helper: derive a deterministic machineHash from a label.
+  function buildMachineHash(value: string): `0x${string}` {
+    return ethers.keccak256(ethers.toUtf8Bytes(value)) as `0x${string}`;
+  }
+
+  async function deployMarketplaceFixture() {
+    const [deployer, vendor, seller, buyer, otherUser] =
+      await ethers.getSigners();
+
+    const KeyCoinFactory = await ethers.getContractFactory("KeyCoin");
+    const keyCoin = (await KeyCoinFactory.connect(deployer).deploy(
+      KEY_RATE
+    )) as unknown as KeyCoin;
+    await keyCoin.waitForDeployment();
+
+    const GameTokenFactory = await ethers.getContractFactory("GameToken");
+    const gameToken = (await GameTokenFactory.connect(
+      deployer
+    ).deploy()) as unknown as GameToken;
+    await gameToken.waitForDeployment();
+
+    const ActivationFactory = await ethers.getContractFactory("ActivationContract");
+    const activation = (await ActivationFactory.connect(deployer).deploy(
+      await gameToken.getAddress()
+    )) as unknown as ActivationContract;
+    await activation.waitForDeployment();
+
+    const MarketplaceFactory = await ethers.getContractFactory("Marketplace");
+    const marketplace = (await MarketplaceFactory.connect(deployer).deploy(
+      await keyCoin.getAddress(),
+      await gameToken.getAddress(),
+      await activation.getAddress()
+    )) as unknown as Marketplace;
+    await marketplace.waitForDeployment();
+
+    // Grant MINTER_ROLE to deployer so the fixture can create and mint directly.
+    const MINTER_ROLE = await gameToken.MINTER_ROLE();
+    await gameToken.connect(deployer).grantRole(MINTER_ROLE, deployer.address);
+
+    // Create the game (10% royalty to vendor) and give the seller one license.
+    await gameToken
+      .connect(deployer)
+      .createGame(TOKEN_ID, vendor.address, ROYALTY_BPS, "ipfs://game-1");
+    await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
+
+    // Fund the buyer with KEY (rate=1 → 10_000 wei buys 10_000 KEY) and approve.
+    const BUYER_KEY = 10_000n;
+    await keyCoin.connect(buyer).buyKeyCoin({ value: BUYER_KEY });
+    await keyCoin
+      .connect(buyer)
+      .approve(await marketplace.getAddress(), ethers.MaxUint256);
+
+    // Seller approves the marketplace to escrow the license unit.
+    await gameToken
+      .connect(seller)
+      .setApprovalForAll(await marketplace.getAddress(), true);
+
+    return {
+      deployer,
+      vendor,
+      seller,
+      buyer,
+      otherUser,
+      keyCoin,
+      gameToken,
+      activation,
+      marketplace,
+      MINTER_ROLE,
+      BUYER_KEY,
+    };
+  }
+
+  describe("deployment", () => {
+    it("stores the KeyCoin address it was constructed with", async () => {
       const { marketplace, keyCoin } = await loadFixture(
         deployMarketplaceFixture
       );
-      expect(await marketplace.keyCoin()).to.equal(
-        await keyCoin.getAddress()
-      );
+
+      expect(await marketplace.keyCoin()).to.equal(await keyCoin.getAddress());
     });
 
-    it("stores the correct GameToken address", async () => {
+    it("stores the GameToken address it was constructed with", async () => {
       const { marketplace, gameToken } = await loadFixture(
         deployMarketplaceFixture
       );
+
       expect(await marketplace.gameToken()).to.equal(
         await gameToken.getAddress()
       );
     });
 
-    it("stores the correct ActivationContract address", async () => {
+    it("stores the ActivationContract address it was constructed with", async () => {
       const { marketplace, activation } = await loadFixture(
         deployMarketplaceFixture
       );
+
       expect(await marketplace.activation()).to.equal(
         await activation.getAddress()
       );
     });
 
-    it("getListing on a non-existent id returns zeroed struct", async () => {
+    it("returns a zeroed listing for a non-existent id", async () => {
       const { marketplace } = await loadFixture(deployMarketplaceFixture);
+
       const listing = await marketplace.getListing(999n);
-      expect(listing.isOpen).to.be.false;
+      expect(listing.isOpen).to.equal(false);
       expect(listing.seller).to.equal(ethers.ZeroAddress);
       expect(listing.price).to.equal(0n);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 2. listLicense()
-  // -------------------------------------------------------------------------
-  describe("listLicense()", () => {
-    it("succeeds when seller owns an inactive license", async () => {
+  describe("listLicense", () => {
+    it("succeeds when the seller owns an inactive license", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await expect(
         marketplace.connect(seller).listLicense(TOKEN_ID, 500n)
       ).to.not.be.reverted;
     });
 
-    it("stores listing with correct seller, tokenId, price and isOpen=true", async () => {
+    it("stores the listing with the right seller, tokenId, price and open flag", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       const PRICE = 500n;
       await marketplace.connect(seller).listLicense(TOKEN_ID, PRICE);
 
@@ -170,52 +151,53 @@ describe("Marketplace", () => {
       expect(listing.tokenId).to.equal(TOKEN_ID);
       expect(listing.seller).to.equal(seller.address);
       expect(listing.price).to.equal(PRICE);
-      expect(listing.isOpen).to.be.true;
+      expect(listing.isOpen).to.equal(true);
     });
 
-    it("escrows the ERC-1155 unit into Marketplace", async () => {
+    it("escrows the ERC-1155 unit into the marketplace", async () => {
       const { marketplace, gameToken, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
 
       expect(
         await gameToken.balanceOf(await marketplace.getAddress(), TOKEN_ID)
       ).to.equal(1n);
-      expect(
-        await gameToken.balanceOf(seller.address, TOKEN_ID)
-      ).to.equal(0n);
+      expect(await gameToken.balanceOf(seller.address, TOKEN_ID)).to.equal(0n);
     });
 
-    it("reverts with 'Marketplace: license active' when license is active in ActivationContract", async () => {
+    it("reverts when the license is active in the ActivationContract", async () => {
       const { marketplace, activation, seller } = await loadFixture(
         deployMarketplaceFixture
       );
-      const machineHash = buildMachineHash("machine-001");
+
       await activation
         .connect(seller)
-        .activateLicense(TOKEN_ID, machineHash);
+        .activateLicense(TOKEN_ID, buildMachineHash("machine-001"));
 
       await expect(
         marketplace.connect(seller).listLicense(TOKEN_ID, 500n)
       ).to.be.revertedWith("Marketplace: license active");
     });
 
-    it("reverts when seller does not own the license (no ERC-1155 balance)", async () => {
+    it("reverts when the seller does not own the license", async () => {
       const { marketplace, otherUser } = await loadFixture(
         deployMarketplaceFixture
       );
-      // otherUser has no license, safeTransferFrom will revert from ERC-1155
+
+      // otherUser has no balance, so the escrow transfer reverts in ERC-1155.
       await expect(
         marketplace.connect(otherUser).listLicense(TOKEN_ID, 500n)
       ).to.be.reverted;
     });
 
-    it("reverts when seller has not approved Marketplace for ERC-1155", async () => {
+    it("reverts when the seller has not approved the marketplace for ERC-1155", async () => {
       const { marketplace, gameToken, deployer } = await loadFixture(
         deployMarketplaceFixture
       );
-      // Mint a license to a fresh signer who never set approval
+
+      // A fresh signer holds a license but never set approval.
       const [, , , , , noApprovalSeller] = await ethers.getSigners();
       await gameToken.connect(deployer).mint(noApprovalSeller.address, TOKEN_ID);
 
@@ -224,43 +206,38 @@ describe("Marketplace", () => {
       ).to.be.reverted;
     });
 
-    it("increments listingId for each new listing", async () => {
+    it("increments the listingId for each new listing", async () => {
       const { marketplace, gameToken, deployer, seller } = await loadFixture(
         deployMarketplaceFixture
       );
 
-      // Mint a second license so seller can list twice
+      // Mint a second unit so the seller can list twice.
       await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
 
       await marketplace.connect(seller).listLicense(TOKEN_ID, 100n);
       await marketplace.connect(seller).listLicense(TOKEN_ID, 200n);
 
-      const listing1 = await marketplace.getListing(1n);
-      const listing2 = await marketplace.getListing(2n);
-      expect(listing1.price).to.equal(100n);
-      expect(listing2.price).to.equal(200n);
+      expect((await marketplace.getListing(1n)).price).to.equal(100n);
+      expect((await marketplace.getListing(2n)).price).to.equal(200n);
     });
 
-    it("can list with price = 0 (no price > 0 guard in contract)", async () => {
-      // NOTE: Marketplace.sol has no require(price > 0) check.
-      // Listing with price=0 is therefore valid at the contract level.
+    it("allows price = 0 because the contract has no price guard", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await expect(
         marketplace.connect(seller).listLicense(TOKEN_ID, 0n)
       ).to.not.be.reverted;
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 3. cancelListing()
-  // -------------------------------------------------------------------------
-  describe("cancelListing()", () => {
-    it("seller can cancel an open listing", async () => {
+  describe("cancelListing", () => {
+    it("lets the seller cancel an open listing", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
 
       await expect(
@@ -268,21 +245,22 @@ describe("Marketplace", () => {
       ).to.not.be.reverted;
     });
 
-    it("listing is closed after cancel (isOpen = false)", async () => {
+    it("closes the listing after cancel", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(seller).cancelListing(1n);
 
-      const listing = await marketplace.getListing(1n);
-      expect(listing.isOpen).to.be.false;
+      expect((await marketplace.getListing(1n)).isOpen).to.equal(false);
     });
 
-    it("license is returned to seller after cancel", async () => {
+    it("returns the escrowed unit to the seller", async () => {
       const { marketplace, gameToken, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(seller).cancelListing(1n);
 
@@ -292,10 +270,11 @@ describe("Marketplace", () => {
       ).to.equal(0n);
     });
 
-    it("reverts with 'Marketplace: not seller' when a non-seller tries to cancel", async () => {
+    it("reverts when a non-seller tries to cancel", async () => {
       const { marketplace, seller, otherUser } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
 
       await expect(
@@ -303,10 +282,11 @@ describe("Marketplace", () => {
       ).to.be.revertedWith("Marketplace: not seller");
     });
 
-    it("reverts with 'Marketplace: not open' when listing is already closed", async () => {
+    it("reverts when the listing is already closed", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(seller).cancelListing(1n);
 
@@ -315,10 +295,11 @@ describe("Marketplace", () => {
       ).to.be.revertedWith("Marketplace: not open");
     });
 
-    it("reverts with 'Marketplace: not open' when listing was already bought", async () => {
+    it("reverts when the listing was already bought", async () => {
       const { marketplace, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(buyer).buyLicense(1n);
 
@@ -327,46 +308,44 @@ describe("Marketplace", () => {
       ).to.be.revertedWith("Marketplace: not open");
     });
 
-    it("reverts with 'Marketplace: not open' on a non-existent listing id", async () => {
+    it("reverts on a non-existent listing id", async () => {
       const { marketplace, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await expect(
         marketplace.connect(seller).cancelListing(999n)
       ).to.be.revertedWith("Marketplace: not open");
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 4. buyLicense()
-  // -------------------------------------------------------------------------
-  describe("buyLicense()", () => {
-    it("buyer can purchase an open listing", async () => {
+  describe("buyLicense", () => {
+    it("lets a buyer purchase an open listing", async () => {
       const { marketplace, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
 
-      await expect(
-        marketplace.connect(buyer).buyLicense(1n)
-      ).to.not.be.reverted;
+      await expect(marketplace.connect(buyer).buyLicense(1n)).to.not.be.reverted;
     });
 
-    it("listing isOpen becomes false after purchase", async () => {
+    it("closes the listing after purchase", async () => {
       const { marketplace, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(buyer).buyLicense(1n);
 
-      const listing = await marketplace.getListing(1n);
-      expect(listing.isOpen).to.be.false;
+      expect((await marketplace.getListing(1n)).isOpen).to.equal(false);
     });
 
-    it("license is transferred from escrow to buyer", async () => {
+    it("transfers the license from escrow to the buyer", async () => {
       const { marketplace, gameToken, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(buyer).buyLicense(1n);
 
@@ -376,14 +355,14 @@ describe("Marketplace", () => {
       ).to.equal(0n);
     });
 
-    it("royalty distribution: vendor receives royalty, seller receives remainder", async () => {
-      const { marketplace, keyCoin, seller, buyer, vendor } =
-        await loadFixture(deployMarketplaceFixture);
+    it("splits royalty to the vendor and the remainder to the seller", async () => {
+      const { marketplace, keyCoin, seller, buyer, vendor } = await loadFixture(
+        deployMarketplaceFixture
+      );
 
-      // price = 1000 KEY units, royaltyBps = 1000 (10%) → royalty = 100
       const PRICE = 1000n;
-      const EXPECTED_ROYALTY = (PRICE * ROYALTY_BPS) / 10_000n; // 100n
-      const EXPECTED_SELLER = PRICE - EXPECTED_ROYALTY; // 900n
+      const royalty = (PRICE * ROYALTY_BPS) / 10_000n; // 100
+      const remainder = PRICE - royalty; // 900
 
       await marketplace.connect(seller).listLicense(TOKEN_ID, PRICE);
 
@@ -394,44 +373,46 @@ describe("Marketplace", () => {
       await marketplace.connect(buyer).buyLicense(1n);
 
       expect(await keyCoin.balanceOf(vendor.address)).to.equal(
-        vendorBefore + EXPECTED_ROYALTY
+        vendorBefore + royalty
       );
       expect(await keyCoin.balanceOf(seller.address)).to.equal(
-        sellerBefore + EXPECTED_SELLER
+        sellerBefore + remainder
       );
       expect(await keyCoin.balanceOf(buyer.address)).to.equal(
         buyerBefore - PRICE
       );
     });
 
-    it("emits RoyaltyPaid with correct tokenId, vendor and royalty amount", async () => {
+    it("emits RoyaltyPaid with the tokenId, vendor and royalty amount", async () => {
       const { marketplace, seller, buyer, vendor } = await loadFixture(
         deployMarketplaceFixture
       );
+
       const PRICE = 1000n;
-      const EXPECTED_ROYALTY = (PRICE * ROYALTY_BPS) / 10_000n;
+      const royalty = (PRICE * ROYALTY_BPS) / 10_000n;
 
       await marketplace.connect(seller).listLicense(TOKEN_ID, PRICE);
 
       await expect(marketplace.connect(buyer).buyLicense(1n))
         .to.emit(marketplace, "RoyaltyPaid")
-        .withArgs(TOKEN_ID, vendor.address, EXPECTED_ROYALTY);
+        .withArgs(TOKEN_ID, vendor.address, royalty);
     });
 
-    it("reverts with 'Marketplace: not open' on a non-existent listing", async () => {
+    it("reverts on a non-existent listing", async () => {
       const { marketplace, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await expect(
         marketplace.connect(buyer).buyLicense(999n)
       ).to.be.revertedWith("Marketplace: not open");
     });
 
-    it("reverts with 'Marketplace: not open' when listing is already sold", async () => {
+    it("reverts when the listing is already sold", async () => {
       const { marketplace, seller, buyer, otherUser, keyCoin } =
         await loadFixture(deployMarketplaceFixture);
 
-      // Fund otherUser with KEY
+      // Fund a second buyer so the failure is "not open", not lack of funds.
       await keyCoin.connect(otherUser).buyKeyCoin({ value: 10_000n });
       await keyCoin
         .connect(otherUser)
@@ -445,10 +426,11 @@ describe("Marketplace", () => {
       ).to.be.revertedWith("Marketplace: not open");
     });
 
-    it("reverts with 'Marketplace: not open' when listing was cancelled", async () => {
+    it("reverts when the listing was cancelled", async () => {
       const { marketplace, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(seller).cancelListing(1n);
 
@@ -457,12 +439,12 @@ describe("Marketplace", () => {
       ).to.be.revertedWith("Marketplace: not open");
     });
 
-    it("reverts when buyer has insufficient KEY balance", async () => {
+    it("reverts when the buyer has insufficient KEY balance", async () => {
       const { marketplace, keyCoin, seller } = await loadFixture(
         deployMarketplaceFixture
       );
 
-      // Create a broke buyer with 0 KEY
+      // A broke buyer with 0 KEY but an approval set.
       const [, , , , , , brokeBuyer] = await ethers.getSigners();
       await keyCoin
         .connect(brokeBuyer)
@@ -472,18 +454,17 @@ describe("Marketplace", () => {
 
       await expect(
         marketplace.connect(brokeBuyer).buyLicense(1n)
-      ).to.be.reverted; // ERC-20 SafeTransferFrom will revert
+      ).to.be.reverted; // ERC-20 transferFrom reverts on insufficient balance
     });
 
-    it("reverts when buyer has not approved Marketplace to spend KEY", async () => {
+    it("reverts when the buyer has not approved the marketplace to spend KEY", async () => {
       const { marketplace, keyCoin, seller } = await loadFixture(
         deployMarketplaceFixture
       );
 
-      // New buyer with KEY but no approval
+      // A buyer with KEY but no approval.
       const [, , , , , , , noApproveBuyer] = await ethers.getSigners();
       await keyCoin.connect(noApproveBuyer).buyKeyCoin({ value: 10_000n });
-      // intentionally skip approve
 
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
 
@@ -492,7 +473,7 @@ describe("Marketplace", () => {
       ).to.be.reverted;
     });
 
-    it("new owner can re-list after purchase after approving Marketplace", async () => {
+    it("lets the new owner re-list after purchase once they approve the marketplace", async () => {
       const { marketplace, gameToken, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
@@ -501,46 +482,44 @@ describe("Marketplace", () => {
       await marketplace.connect(seller).listLicense(TOKEN_ID, PRICE);
       await marketplace.connect(buyer).buyLicense(1n);
 
-      // buyer is now the new owner; approve and re-list
+      // Buyer is now the owner; approve and re-list.
       await gameToken
         .connect(buyer)
         .setApprovalForAll(await marketplace.getAddress(), true);
+
       await expect(
         marketplace.connect(buyer).listLicense(TOKEN_ID, 500n)
       ).to.not.be.reverted;
 
       const listing2 = await marketplace.getListing(2n);
       expect(listing2.seller).to.equal(buyer.address);
-      expect(listing2.isOpen).to.be.true;
+      expect(listing2.isOpen).to.equal(true);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 5. Activation / state transitions
-  // -------------------------------------------------------------------------
-  describe("Activation / state transitions", () => {
-    it("cannot list an active license — seller must deactivate first", async () => {
+  describe("activation and state transitions", () => {
+    it("cannot list an active license — the seller must deactivate first", async () => {
       const { marketplace, activation, seller } = await loadFixture(
         deployMarketplaceFixture
       );
-      const machineHash = buildMachineHash("machine-001");
+
       await activation
         .connect(seller)
-        .activateLicense(TOKEN_ID, machineHash);
+        .activateLicense(TOKEN_ID, buildMachineHash("machine-001"));
 
       await expect(
         marketplace.connect(seller).listLicense(TOKEN_ID, 500n)
       ).to.be.revertedWith("Marketplace: license active");
     });
 
-    it("seller can list after deactivating an active license", async () => {
+    it("lets the seller list after deactivating an active license", async () => {
       const { marketplace, activation, seller } = await loadFixture(
         deployMarketplaceFixture
       );
-      const machineHash = buildMachineHash("machine-001");
+
       await activation
         .connect(seller)
-        .activateLicense(TOKEN_ID, machineHash);
+        .activateLicense(TOKEN_ID, buildMachineHash("machine-001"));
       await activation.connect(seller).deactivateLicense(TOKEN_ID);
 
       await expect(
@@ -548,78 +527,69 @@ describe("Marketplace", () => {
       ).to.not.be.reverted;
     });
 
-    it("full flow: Inactive → Listed (escrow) → Bought → Buyer owns inactive license", async () => {
+    it("runs the full flow: Inactive → Listed (escrow) → Bought → buyer owns inactive license", async () => {
       const { marketplace, gameToken, activation, seller, buyer } =
         await loadFixture(deployMarketplaceFixture);
 
-      // Confirm seller's license starts inactive
-      expect(await activation.isActive(seller.address, TOKEN_ID)).to.be.false;
+      // Seller's license starts inactive.
+      expect(await activation.isActive(seller.address, TOKEN_ID)).to.equal(false);
 
-      // Seller lists → license goes into escrow
+      // Listing escrows the unit.
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       expect(
         await gameToken.balanceOf(await marketplace.getAddress(), TOKEN_ID)
       ).to.equal(1n);
 
-      // Buyer purchases → license transferred to buyer
+      // Buying transfers the unit to the buyer.
       await marketplace.connect(buyer).buyLicense(1n);
       expect(await gameToken.balanceOf(buyer.address, TOKEN_ID)).to.equal(1n);
 
-      // NOTE: Marketplace does NOT call ActivationContract.deactivateLicense()
-      // on behalf of anyone. The design guarantee is: a license can only be
-      // listed when it is inactive in ActivationContract. The seller's own
-      // activation record (seller, tokenId) remains as-is after the transfer,
-      // but the buyer's activation record (buyer, tokenId) starts as inactive
-      // because the buyer has never called activateLicense().
-      expect(await activation.isActive(buyer.address, TOKEN_ID)).to.be.false;
+      // The marketplace never touches activation records: the buyer's
+      // (buyer, tokenId) record is inactive because they never activated.
+      expect(await activation.isActive(buyer.address, TOKEN_ID)).to.equal(false);
     });
 
-    it("after buying, buyer can activate their license on a new machine", async () => {
+    it("lets the buyer activate their license on a new machine after buying", async () => {
       const { marketplace, activation, seller, buyer } = await loadFixture(
         deployMarketplaceFixture
       );
+
       await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
       await marketplace.connect(buyer).buyLicense(1n);
 
-      const machineHash = buildMachineHash("buyer-machine");
       await expect(
         activation
           .connect(buyer)
-          .activateLicense(TOKEN_ID, machineHash)
+          .activateLicense(TOKEN_ID, buildMachineHash("buyer-machine"))
       ).to.not.be.reverted;
 
-      expect(await activation.isActive(buyer.address, TOKEN_ID)).to.be.true;
+      expect(await activation.isActive(buyer.address, TOKEN_ID)).to.equal(true);
     });
 
-    it("activate → deactivate → list: full seller lifecycle before resale", async () => {
+    it("runs the seller lifecycle activate → deactivate → list before resale", async () => {
       const { marketplace, activation, seller } = await loadFixture(
         deployMarketplaceFixture
       );
+
       const machineHash = buildMachineHash("machine-seller");
 
-      // Activate on a device
-      await activation
-        .connect(seller)
-        .activateLicense(TOKEN_ID, machineHash);
-      expect(await activation.isActive(seller.address, TOKEN_ID)).to.be.true;
+      // Activate on a device.
+      await activation.connect(seller).activateLicense(TOKEN_ID, machineHash);
+      expect(await activation.isActive(seller.address, TOKEN_ID)).to.equal(true);
 
-      // Deactivate to prepare for resale
+      // Deactivate to prepare for resale.
       await activation.connect(seller).deactivateLicense(TOKEN_ID);
-      expect(await activation.isActive(seller.address, TOKEN_ID)).to.be.false;
+      expect(await activation.isActive(seller.address, TOKEN_ID)).to.equal(false);
 
-      // List successfully
+      // List successfully.
       await expect(
         marketplace.connect(seller).listLicense(TOKEN_ID, 800n)
       ).to.not.be.reverted;
 
-      const listing = await marketplace.getListing(1n);
-      expect(listing.isOpen).to.be.true;
+      expect((await marketplace.getListing(1n)).isOpen).to.equal(true);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // 6. ERC-1155 receiver
-  // -------------------------------------------------------------------------
   describe("ERC-1155 receiver", () => {
     it("advertises IERC1155Receiver support and accepts batch receipts", async () => {
       const { marketplace, buyer } = await loadFixture(
@@ -630,10 +600,11 @@ describe("Marketplace", () => {
       const ERC165_ID = "0x01ffc9a7";
       const BATCH_SELECTOR = "0xbc197c81"; // onERC1155BatchReceived selector
 
-      expect(await marketplace.supportsInterface(IERC1155_RECEIVER_ID)).to.be
-        .true;
-      expect(await marketplace.supportsInterface(ERC165_ID)).to.be.true;
-      expect(await marketplace.supportsInterface("0xffffffff")).to.be.false;
+      expect(await marketplace.supportsInterface(IERC1155_RECEIVER_ID)).to.equal(
+        true
+      );
+      expect(await marketplace.supportsInterface(ERC165_ID)).to.equal(true);
+      expect(await marketplace.supportsInterface("0xffffffff")).to.equal(false);
       expect(
         await marketplace.onERC1155BatchReceived(
           buyer.address,

@@ -2,7 +2,10 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe("KeyCoin", function () {
+// KeyCoin — the platform's ERC-20 currency. Users mint KEY by sending ETH at
+// the current rate (buyKeyCoin); the admin controls the rate and can withdraw
+// the accumulated ETH.
+describe("KeyCoin", () => {
   const INITIAL_RATE = 100n;
   const DEFAULT_ADMIN_ROLE = ethers.ZeroHash;
 
@@ -13,28 +16,29 @@ describe("KeyCoin", function () {
     return { keyCoin, admin, user1, user2 };
   }
 
-  describe("Deployment", function () {
-    it("Should set the right initial rate", async function () {
+  describe("deployment", () => {
+    it("sets the initial rate from the constructor", async () => {
       const { keyCoin } = await loadFixture(deployKeyCoinFixture);
       expect(await keyCoin.rate()).to.equal(INITIAL_RATE);
     });
 
-    it("Should grant DEFAULT_ADMIN_ROLE to deployer", async function () {
+    it("grants DEFAULT_ADMIN_ROLE to the deployer", async () => {
       const { keyCoin, admin } = await loadFixture(deployKeyCoinFixture);
-      expect(await keyCoin.hasRole(DEFAULT_ADMIN_ROLE, admin.address)).to.be.true;
+      expect(await keyCoin.hasRole(DEFAULT_ADMIN_ROLE, admin.address)).to.equal(
+        true
+      );
     });
   });
 
-  describe("setRate", function () {
-    it("Should allow admin to update the rate", async function () {
+  describe("setRate", () => {
+    it("lets the admin update the rate", async () => {
       const { keyCoin } = await loadFixture(deployKeyCoinFixture);
       const newRate = 200n;
       await keyCoin.setRate(newRate);
       expect(await keyCoin.rate()).to.equal(newRate);
     });
 
-    // CASE MỚI: Check việc buy theo rate mới
-    it("Should mint at the new rate after setRate", async function () {
+    it("mints at the new rate on the next purchase", async () => {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
       await keyCoin.setRate(200n);
       const ethAmount = ethers.parseEther("1");
@@ -42,7 +46,7 @@ describe("KeyCoin", function () {
       expect(await keyCoin.balanceOf(user1.address)).to.equal(ethAmount * 200n);
     });
 
-    it("Should revert if non-admin tries to update the rate", async function () {
+    it("reverts when a non-admin tries to update the rate", async () => {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
       const newRate = 200n;
       await expect(keyCoin.connect(user1).setRate(newRate))
@@ -51,8 +55,8 @@ describe("KeyCoin", function () {
     });
   });
 
-  describe("buyKeyCoin", function () {
-    it("Should mint correct amount of KEY based on ETH sent and current rate", async function () {
+  describe("buyKeyCoin", () => {
+    it("mints KEY proportional to ETH sent at the current rate", async () => {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
       const ethAmount = ethers.parseEther("1");
       await keyCoin.connect(user1).buyKeyCoin({ value: ethAmount });
@@ -60,27 +64,32 @@ describe("KeyCoin", function () {
       expect(await keyCoin.balanceOf(user1.address)).to.equal(expectedKey);
     });
 
-    it("Should revert if no ETH is sent", async function () {
+    it("reverts when no ETH is sent", async () => {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
-      await expect(keyCoin.connect(user1).buyKeyCoin({ value: 0n }))
-        .to.be.revertedWith("KeyCoin: no ETH sent");
+      await expect(
+        keyCoin.connect(user1).buyKeyCoin({ value: 0n })
+      ).to.be.revertedWith("KeyCoin: no ETH sent");
     });
   });
 
-  describe("withdraw", function () {
-    it("Should allow admin to withdraw ETH from contract", async function () {
+  describe("withdraw", () => {
+    it("lets the admin withdraw the contract's ETH", async () => {
       const { keyCoin, admin, user1 } = await loadFixture(deployKeyCoinFixture);
       const ethAmount = ethers.parseEther("2");
       await keyCoin.connect(user1).buyKeyCoin({ value: ethAmount });
+
       const initialAdminBalance = await ethers.provider.getBalance(admin.address);
       const tx = await keyCoin.withdraw();
       const receipt = await tx.wait();
       const gasUsed = BigInt(receipt!.gasUsed) * BigInt(receipt!.gasPrice);
       const finalAdminBalance = await ethers.provider.getBalance(admin.address);
-      expect(finalAdminBalance).to.equal(initialAdminBalance + ethAmount - gasUsed);
+
+      expect(finalAdminBalance).to.equal(
+        initialAdminBalance + ethAmount - gasUsed
+      );
     });
 
-    it("Should revert if non-admin tries to withdraw", async function () {
+    it("reverts when a non-admin tries to withdraw", async () => {
       const { keyCoin, user1 } = await loadFixture(deployKeyCoinFixture);
       await expect(keyCoin.connect(user1).withdraw())
         .to.be.revertedWithCustomError(keyCoin, "AccessControlUnauthorizedAccount")
