@@ -4,6 +4,7 @@ import {
   formatKey,
   truncateHash,
   formatDate,
+  parseKey,
 } from "@/lib/format";
 
 describe("truncateAddress", () => {
@@ -38,5 +39,19 @@ describe("truncateHash", () => {
 describe("formatDate", () => {
   it("formats an ISO date in en-US", () => {
     expect(formatDate("2026-06-13T12:00:00")).toBe("Jun 13, 2026");
+  });
+});
+
+describe("parseKey", () => {
+  it("scales a whole KEY amount to 18-decimal base units", () => {
+    expect(parseKey("300")).toBe(BigInt("300000000000000000000"));
+  });
+
+  it("treats an empty string as zero", () => {
+    expect(parseKey("")).toBe(BigInt(0));
+  });
+
+  it("round-trips with formatKey", () => {
+    expect(formatKey(parseKey("42"))).toBe("42");
   });
 });
