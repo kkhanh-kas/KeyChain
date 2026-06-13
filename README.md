@@ -7,10 +7,10 @@
 
 | Người | Vai trò | Code | Report |
 |---|---|---|---|
-| **Uyên Khánh** | Smart Contracts + Frontend + Backend | 6 smart contracts, toàn bộ frontend, API routes | Chương 5.4, 5.5, 5.2 |
+| **Uyên Khánh** | Smart Contracts + Frontend + Backend | 6 smart contracts, toàn bộ frontend, API routes, **deploy lên Sepolia** | Chương 5.4, 5.5, 5.2 |
 | **Công Danh** | Unit Tests (Core) | Tests: KeyCoin, GameToken, GameStore | Chương 2.3, Chương 6.1.1 (3 contracts) |
 | **Tấn Phát** | Unit Tests (Advanced) | Tests: ActivationContract, Marketplace, GamePass | Chương 4.2, 4.3, Chương 6.1.1 (3 contracts), 6.3 |
-| **Phước Tình** | Integration Tests + DevOps | Integration tests (3 kịch bản), deploy scripts, deploy lên Sepolia | Chương 5.1, 5.3, 6.1.2, 6.2 |
+| **Phước Tình** | Integration Tests + DevOps | Integration tests (3 kịch bản), deploy scripts. **Deploy Sepolia do Uyên Khánh chạy** → Phước Tình chỉ pull về test E2E + chụp screenshots | Chương 5.1, 5.3, 6.1.2, 6.2 |
 | **Mỹ Khánh** | Research + System Analysis | Không | Chương 1, 2, 3 |
 | **Hoài Nam** | Design + Evaluation + Review | Không | Chương 4, 5.2, 6.4, 7 |
 ---
@@ -35,8 +35,11 @@
 | Frontend (all pages) | Landing, Store, Library, Marketplace, Vendor Portal | 🟡 Song song với contracts |
 | API Routes | Pinata upload, IPFS resolver | 🟢 Sau khi có contracts |
 | Hooks + Providers | useWallet, useGameStore, useActivation, ... | 🟢 Sau khi contracts xong |
+| Deploy + roles | `deploy:sepolia` → `setup-roles` → `seed` → `verify` | 🟢 Cuối, trước demo |
 
-> **Lưu ý:** Code frontend với mock data trước, swap hooks thật sau khi contracts deploy. 
+> **Lưu ý chiến lược (chốt 13/06):** KHÔNG dùng mock data. Dev hằng ngày bằng `deploy:local` (Hardhat node ở `localhost:8545`) → hook gọi contract THẬT. Khi deploy Sepolia xong chỉ cần đổi 6 dòng `NEXT_PUBLIC_*_ADDRESS` trong `frontend/.env.local`. Lý do: địa chỉ contract là public (không phải bí mật), chỉ `.env` chứa private key/secret mới phải giấu — và `.gitignore` đã chặn sẵn.
+
+> **Roles (quan trọng cho demo):** Uyên Khánh là người chạy `deploy:sepolia` nên ví deploy = **Admin** (`DEFAULT_ADMIN_ROLE`). Trong `setup-roles.ts`, mảng `VENDORS` phải cấp `VENDOR_ROLE` cho **cả ví Uyên Khánh lẫn ví Phước Tình** để cả hai test được Vendor Portal. `MINTER_ROLE` chỉ cấp cho contract `GameStore` (không phải người). `CUSTOMER_ROLE` cấp cho ví dùng để test mua/activate. Chỉ deploy Sepolia **MỘT lần, một người** rồi đóng băng `deployments/sepolia.json` — tránh hai người deploy lệch địa chỉ.
 
 
 ---
@@ -71,10 +74,10 @@
 - `happy-path.test.ts` : ETH → KEY → mua game → activate → xác nhận
 - `secondary-market.test.ts` : mua → activate → list → người khác mua → royalty tự động → activation reset
 - `game-pass.test.ts` : subscribe → hết hạn → renew
-- `deploy.ts`, `setup-roles.ts`, `seed-games.ts`, `verify.ts`, `copy-abi.sh`
-- Deploy lên Sepolia, verify trên Etherscan, tạo demo data, chụp screenshots
+- `deploy.ts`, `setup-roles.ts`, `seed-games.ts`, `verify.ts`, `copy-abi.sh` (scripts đã viết xong)
+- **Deploy Sepolia do Uyên Khánh chạy.** Phước Tình: pull code về, trỏ frontend vào địa chỉ đã deploy, test E2E trên trình duyệt + ví thật, chụp screenshots.
 
-> Chạy toàn bộ hệ thống end-to-end.
+> Chạy toàn bộ hệ thống end-to-end. Nhận từ Uyên Khánh: `sepolia.json` (6 địa chỉ) + link Etherscan đã verify + lệnh deploy đã chạy (để viết Chương 5.3/6.2).
 
 ---
 
