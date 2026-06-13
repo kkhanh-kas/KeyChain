@@ -102,6 +102,36 @@ contract Marketplace is ReentrancyGuard, IERC1155Receiver {
         return _listings[listingId];
     }
 
+    /// @notice All currently-open listings, ids returned alongside their structs
+    ///         so the frontend need not derive ids from array position.
+    /// @dev Mirrors GameStore.getCatalog. Two passes: count open listings to size
+    ///      the fixed-length memory arrays, then fill them. Iterates the whole
+    ///      listing space — acceptable at demo scale; not paginated.
+    function getOpenListings()
+        external
+        view
+        returns (uint256[] memory ids, Listing[] memory listings)
+    {
+        uint256 openCount = 0;
+        for (uint256 id = 1; id < _nextListingId; id++) {
+            if (_listings[id].isOpen) {
+                openCount++;
+            }
+        }
+
+        ids = new uint256[](openCount);
+        listings = new Listing[](openCount);
+
+        uint256 cursor = 0;
+        for (uint256 id = 1; id < _nextListingId; id++) {
+            if (_listings[id].isOpen) {
+                ids[cursor] = id;
+                listings[cursor] = _listings[id];
+                cursor++;
+            }
+        }
+    }
+
     // ── ERC-1155 receiver hooks (required to hold escrowed units) ──
 
     function onERC1155Received(address, address, uint256, uint256, bytes calldata)

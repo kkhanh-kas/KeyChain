@@ -590,6 +590,84 @@ describe("Marketplace", () => {
     });
   });
 
+  describe("getOpenListings", () => {
+    it("returns empty arrays when there are no listings", async () => {
+      const { marketplace } = await loadFixture(deployMarketplaceFixture);
+
+      const [ids, listings] = await marketplace.getOpenListings();
+      expect(ids.length).to.equal(0);
+      expect(listings.length).to.equal(0);
+    });
+
+    it("returns a single open listing with its id alongside the struct", async () => {
+      const { marketplace, seller } = await loadFixture(
+        deployMarketplaceFixture
+      );
+
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 500n);
+
+      const [ids, listings] = await marketplace.getOpenListings();
+      expect(ids).to.deep.equal([1n]);
+      expect(listings.length).to.equal(1);
+      expect(listings[0].tokenId).to.equal(TOKEN_ID);
+      expect(listings[0].seller).to.equal(seller.address);
+      expect(listings[0].price).to.equal(500n);
+      expect(listings[0].isOpen).to.equal(true);
+    });
+
+    it("excludes a cancelled listing", async () => {
+      const { marketplace, gameToken, deployer, seller } = await loadFixture(
+        deployMarketplaceFixture
+      );
+
+      // Two units so the seller can hold one open listing after cancelling one.
+      await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
+
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 100n);
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 200n);
+      await marketplace.connect(seller).cancelListing(1n);
+
+      const [ids, listings] = await marketplace.getOpenListings();
+      expect(ids).to.deep.equal([2n]);
+      expect(listings[0].price).to.equal(200n);
+    });
+
+    it("excludes a bought listing", async () => {
+      const { marketplace, gameToken, deployer, seller, buyer } =
+        await loadFixture(deployMarketplaceFixture);
+
+      await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
+
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 100n);
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 200n);
+      await marketplace.connect(buyer).buyLicense(1n);
+
+      const [ids, listings] = await marketplace.getOpenListings();
+      expect(ids).to.deep.equal([2n]);
+      expect(listings[0].price).to.equal(200n);
+    });
+
+    it("returns every open listing with ids aligned to their structs", async () => {
+      const { marketplace, gameToken, deployer, seller } = await loadFixture(
+        deployMarketplaceFixture
+      );
+
+      // Three open listings, then cancel the middle one to leave a gap in ids.
+      await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
+      await gameToken.connect(deployer).mint(seller.address, TOKEN_ID);
+
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 100n);
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 200n);
+      await marketplace.connect(seller).listLicense(TOKEN_ID, 300n);
+      await marketplace.connect(seller).cancelListing(2n);
+
+      const [ids, listings] = await marketplace.getOpenListings();
+      expect(ids).to.deep.equal([1n, 3n]);
+      expect(listings[0].price).to.equal(100n);
+      expect(listings[1].price).to.equal(300n);
+    });
+  });
+
   describe("ERC-1155 receiver", () => {
     it("advertises IERC1155Receiver support and accepts batch receipts", async () => {
       const { marketplace, buyer } = await loadFixture(
