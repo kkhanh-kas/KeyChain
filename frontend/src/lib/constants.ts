@@ -1,12 +1,17 @@
-/**
- * KeyChain constants
- * Chain, roles, and contract references used across the frontend.
- */
+// Chain, roles, and contract references used across the frontend.
+
+import { id } from "ethers";
 
 // ── Network ──
 export const SEPOLIA_CHAIN_ID = 11155111;
 export const SEPOLIA_CHAIN_ID_HEX = "0xaa36a7";
 export const SEPOLIA_RPC = process.env.NEXT_PUBLIC_ALCHEMY_RPC ?? "";
+
+// Chain the wallet must be on. Defaults to Sepolia; set NEXT_PUBLIC_CHAIN_ID
+// to 31337 for local Hardhat dev.
+export const TARGET_CHAIN_ID = Number(
+  process.env.NEXT_PUBLIC_CHAIN_ID ?? SEPOLIA_CHAIN_ID
+);
 
 // ── Contract names (must match ABI filenames in src/abi/) ──
 export const CONTRACT_NAMES = [
@@ -20,14 +25,13 @@ export const CONTRACT_NAMES = [
 
 export type ContractName = (typeof CONTRACT_NAMES)[number];
 
-// ── On-chain roles (keccak256 of role strings, from OpenZeppelin AccessControl) ──
-// These are computed at deploy time; values here for reference/comparison.
-// Usage: contract.hasRole(ROLES.VENDOR, address)
+// On-chain roles (OpenZeppelin AccessControl). Only VENDOR and MINTER are
+// enforced on-chain; there is no customer role — any wallet without a role can
+// buy, activate, and resell. Usage: contract.hasRole(ROLES.VENDOR, address).
 export const ROLES = {
   ADMIN: "0x0000000000000000000000000000000000000000000000000000000000000000", // DEFAULT_ADMIN_ROLE
-  VENDOR: "", // keccak256("VENDOR_ROLE") — fill after contract compile
-  MINTER: "", // keccak256("MINTER_ROLE") — fill after contract compile
-  CUSTOMER: "", // keccak256("CUSTOMER_ROLE") — fill after contract compile
+  VENDOR: id("VENDOR_ROLE"),
+  MINTER: id("MINTER_ROLE"),
 } as const;
 
 // ── Etherscan ──
