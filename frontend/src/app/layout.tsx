@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "@/styles/globals.css";
+import { ThemeProvider } from "@/providers/ThemeProvider";
+import { WalletProvider } from "@/providers/WalletProvider";
+import { ToastProvider } from "@/providers/ToastProvider";
 
 export const metadata: Metadata = {
   title: "KeyChain — Decentralized Game License Platform",
@@ -18,18 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        {/* TODO: Wrap with providers once they're implemented
-            <ThemeProvider>
-              <WalletProvider>
-                <ContractProvider>
-                  <ToastProvider>
-                    {children}
-                  </ToastProvider>
-                </ContractProvider>
-              </WalletProvider>
-            </ThemeProvider>
-        */}
-        {children}
+        <ThemeProvider>
+          <WalletProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </WalletProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
