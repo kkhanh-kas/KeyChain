@@ -39,8 +39,8 @@ export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { status, address, switchNetwork, connect } = useWallet();
 
-  // The landing page is the entrance; it has no navbar.
-  if (pathname === "/") return null;
+  // Landing is the entrance and the Vendor portal has its own shell; no navbar.
+  if (pathname === "/" || pathname.startsWith("/vendor")) return null;
 
   return (
     <nav className="navbar">
