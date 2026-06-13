@@ -50,6 +50,9 @@
 
   /* Spacing */
   --navbar-height: 64px;
+
+  /* Elevation */
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Dark theme ── */
@@ -70,6 +73,8 @@
   --error: #ef4444;
 
   --border: #333333;
+
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* ── Base reset ── */
@@ -93,6 +98,19 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
 /* ── Typography utilities ── */
@@ -123,3 +141,108 @@ body {
   background-color: var(--accent-primary);
   color: #ffffff;
 }
+
+/* ── Navbar (ported from design-reference/styles.css) ── */
+.navbar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 32px;
+  padding: 14px 40px;
+  background: color-mix(in oklab, var(--bg-tertiary) 88%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.navbar__brand {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display); font-weight: 700; font-size: 20px;
+  letter-spacing: 0.01em;
+}
+.navbar__tabs { display: flex; gap: 4px; margin-left: 8px; }
+.navbar__tab {
+  position: relative;
+  padding: 8px 14px;
+  font-size: 14px; font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  transition: color 150ms;
+}
+.navbar__tab:hover { color: var(--text-primary); }
+.navbar__tab--active { color: var(--accent-primary); }
+.navbar__tab--active::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: 2px;
+  height: 2px; background: var(--accent-primary); border-radius: 2px;
+}
+.navbar__right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.navbar__search {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-primary);
+  width: 240px;
+}
+.navbar__search input {
+  background: none; border: none; outline: none; flex: 1;
+  font-size: 13px; color: var(--text-primary);
+}
+.navbar__search input::placeholder { color: var(--text-secondary); }
+.icon-btn {
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  transition: background-color 150ms, color 150ms;
+}
+.icon-btn:hover { background: var(--accent-soft); color: var(--accent-primary); }
+.wallet-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-mono); font-size: 12px;
+  background: var(--bg-primary);
+  transition: all 150ms;
+}
+.wallet-btn:hover { border-color: var(--accent-primary); }
+.wallet-btn.connected { border-color: var(--accent-primary); color: var(--text-primary); }
+.wallet-btn.wrong { border-color: var(--warning); color: var(--warning); }
+.wallet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px color-mix(in oklab, var(--success) 25%, transparent); }
+.wallet-btn.wrong .wallet-dot { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in oklab, var(--warning) 25%, transparent); }
+
+/* ── Toast region (ported from design-reference/styles.css) ── */
+.toast-region {
+  position: fixed; top: 90px; right: 32px;
+  z-index: 120;
+  display: flex; flex-direction: column; gap: 10px;
+  width: 320px;
+}
+.toast {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 13px;
+  box-shadow: var(--shadow-card);
+  animation: toastIn 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toast--success { border-left-color: var(--success); }
+.toast--error { border-left-color: var(--error); }
+.toast__head { display: flex; justify-content: space-between; align-items: center; }
+.toast__title { font-weight: 600; }
+.toast__close { color: var(--text-secondary); padding: 0 4px; }
+.toast__msg { color: var(--text-secondary); font-size: 12px; }
+.toast__hash { font-family: var(--font-mono); color: var(--accent-primary); font-size: 11px; text-decoration: underline; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Spinner ── */
+.spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--text-secondary); border-top-color: transparent;
+  animation: spin 700ms linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

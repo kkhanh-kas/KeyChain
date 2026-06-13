@@ -3,6 +3,7 @@ import "@/styles/globals.css";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { WalletProvider } from "@/providers/WalletProvider";
 import { ToastProvider } from "@/providers/ToastProvider";
+import { Navbar } from "@/components/layout/Navbar";
 
 export const metadata: Metadata = {
   title: "KeyChain — Decentralized Game License Platform",
@@ -23,7 +24,10 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <WalletProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <Navbar />
+              {children}
+            </ToastProvider>
           </WalletProvider>
         </ThemeProvider>
       </body>
