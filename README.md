@@ -37,11 +37,6 @@
 | Hooks + Providers | useWallet, useGameStore, useActivation, ... | 🟢 Sau khi contracts xong |
 | Deploy + roles | `deploy:sepolia` → `setup-roles` → `seed` → `verify` | 🟢 Cuối, trước demo |
 
-> **Lưu ý chiến lược (chốt 13/06):** KHÔNG dùng mock data. Dev hằng ngày bằng `deploy:local` (Hardhat node ở `localhost:8545`) → hook gọi contract THẬT. Khi deploy Sepolia xong chỉ cần đổi 6 dòng `NEXT_PUBLIC_*_ADDRESS` trong `frontend/.env.local`. Lý do: địa chỉ contract là public (không phải bí mật), chỉ `.env` chứa private key/secret mới phải giấu — và `.gitignore` đã chặn sẵn.
-
-> **Roles (quan trọng cho demo):** Uyên Khánh là người chạy `deploy:sepolia` nên ví deploy = **Admin** (`DEFAULT_ADMIN_ROLE`). Trong `setup-roles.ts`, mảng `VENDORS` phải cấp `VENDOR_ROLE` cho **cả ví Uyên Khánh lẫn ví Phước Tình** để cả hai test được Vendor Portal. `MINTER_ROLE` chỉ cấp cho contract `GameStore` (không phải người). `CUSTOMER_ROLE` cấp cho ví dùng để test mua/activate. Chỉ deploy Sepolia **MỘT lần, một người** rồi đóng băng `deployments/sepolia.json` — tránh hai người deploy lệch địa chỉ.
-
-
 ---
 
 ### Công Danh: Unit Tests (Core Contracts)
