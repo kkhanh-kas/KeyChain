@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useContract } from "@/hooks/useContract";
+import { useWallet } from "@/providers/WalletProvider";
 import { useTx } from "@/hooks/useTx";
 
 export interface Listing {
@@ -18,6 +19,9 @@ export interface Listing {
 
 export function useMarketplace() {
   const marketplace = useContract("Marketplace");
+  const keyCoin = useContract("KeyCoin");
+  const gameToken = useContract("GameToken");
+  const { address } = useWallet();
   const { run, pending } = useTx();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,28 +52,38 @@ export function useMarketplace() {
     void refetch();
   }, [refetch]);
 
+  // Listing escrows the ERC-1155 unit, so approve Marketplace as operator first.
   const listLicense = useCallback(
     async (tokenId: number, price: bigint) => {
-      if (!marketplace) throw new Error("Marketplace contract unavailable");
+      if (!marketplace || !gameToken || !address) throw new Error("Wallet not connected");
+      const operator = await marketplace.getAddress();
+      if (!(await gameToken.isApprovedForAll(address, operator))) {
+        await run("Approved Marketplace", () => gameToken.setApprovalForAll(operator, true));
+      }
       const receipt = await run("License listed", () =>
         marketplace.listLicense(tokenId, price)
       );
       await refetch();
       return receipt;
     },
-    [marketplace, run, refetch]
+    [marketplace, gameToken, address, run, refetch]
   );
 
+  // Buying pulls `price` KEY via transferFrom, so approve Marketplace first.
   const buyLicense = useCallback(
-    async (listingId: number) => {
-      if (!marketplace) throw new Error("Marketplace contract unavailable");
+    async (listingId: number, price: bigint) => {
+      if (!marketplace || !keyCoin || !address) throw new Error("Wallet not connected");
+      const spender = await marketplace.getAddress();
+      if ((await keyCoin.allowance(address, spender)) < price) {
+        await run("Approved KEY", () => keyCoin.approve(spender, price));
+      }
       const receipt = await run("License bought", () =>
         marketplace.buyLicense(listingId)
       );
       await refetch();
       return receipt;
     },
-    [marketplace, run, refetch]
+    [marketplace, keyCoin, address, run, refetch]
   );
 
   const cancelListing = useCallback(

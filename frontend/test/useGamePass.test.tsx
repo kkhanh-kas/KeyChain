@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { ToastProvider } from "@/providers/ToastProvider";
+import { WalletProvider } from "@/providers/WalletProvider";
 
 const { expiryOfMock } = vi.hoisted(() => ({ expiryOfMock: vi.fn() }));
 
@@ -11,7 +12,9 @@ vi.mock("@/hooks/useContract", () => ({
 import { useGamePass } from "@/hooks/useGamePass";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ToastProvider>{children}</ToastProvider>
+  <WalletProvider>
+    <ToastProvider>{children}</ToastProvider>
+  </WalletProvider>
 );
 
 describe("useGamePass.isSubscribed", () => {

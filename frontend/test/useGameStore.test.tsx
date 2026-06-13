@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { ToastProvider } from "@/providers/ToastProvider";
+import { WalletProvider } from "@/providers/WalletProvider";
 
 const { getCatalogMock } = vi.hoisted(() => ({ getCatalogMock: vi.fn() }));
 
@@ -15,7 +16,9 @@ vi.mock("@/hooks/useContract", () => ({
 import { useGameStore } from "@/hooks/useGameStore";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ToastProvider>{children}</ToastProvider>
+  <WalletProvider>
+    <ToastProvider>{children}</ToastProvider>
+  </WalletProvider>
 );
 
 describe("useGameStore catalog mapping", () => {

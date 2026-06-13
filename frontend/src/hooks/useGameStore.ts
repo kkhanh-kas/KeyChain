@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useContract } from "@/hooks/useContract";
+import { useWallet } from "@/providers/WalletProvider";
 import { useTx } from "@/hooks/useTx";
 
 export interface Game {
@@ -18,6 +19,8 @@ export interface Game {
 
 export function useGameStore() {
   const store = useContract("GameStore");
+  const keyCoin = useContract("KeyCoin");
+  const { address } = useWallet();
   const { run, pending } = useTx();
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,12 +52,18 @@ export function useGameStore() {
     void refetch();
   }, [refetch]);
 
+  // purchaseLicense pulls `price` KEY via transferFrom, so approve GameStore for
+  // the price first (skipped when the existing allowance already covers it).
   const purchaseLicense = useCallback(
-    async (gameId: number) => {
-      if (!store) throw new Error("GameStore contract unavailable");
+    async (gameId: number, price: bigint) => {
+      if (!store || !keyCoin || !address) throw new Error("Wallet not connected");
+      const spender = await store.getAddress();
+      if ((await keyCoin.allowance(address, spender)) < price) {
+        await run("Approved KEY", () => keyCoin.approve(spender, price));
+      }
       return run("License purchased", () => store.purchaseLicense(gameId));
     },
-    [store, run]
+    [store, keyCoin, address, run]
   );
 
   const registerGame = useCallback(
