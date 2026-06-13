@@ -1,15 +1,7 @@
-/**
- * Keychan Mascot — SVG component
- *
- * Minimalist line-art cat whose tail transforms into a skeleton key blade.
- * Ported from design-reference/components/shell.jsx (Mascot function).
- *
- * Usage:
- *   <Mascot size={80} />                   — default, for empty states
- *   <Mascot size={32} className="..." />    — small, for navbar brand mark
- *
- * Color: inherits currentColor from parent, so it follows the theme.
- */
+// Keychan mascot — a minimalist line-art cat whose tail becomes a skeleton key
+// blade. Ported from design-reference/components/shell.jsx (Mascot function).
+// Sized via the `size` prop (default for empty states, smaller for the navbar
+// brand mark); inherits currentColor from the parent so it follows the theme.
 
 interface MascotProps {
   size?: number;

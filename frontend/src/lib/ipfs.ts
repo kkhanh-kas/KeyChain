@@ -1,22 +1,12 @@
-/**
- * IPFS Utilities
- *
- * Resolves IPFS URIs (ipfs://Qm...) to HTTP gateway URLs for display.
- * Game metadata (title, description, cover image) is stored on IPFS
- * and referenced by GameToken's tokenURI.
- *
- * On-chain / Off-chain boundary:
- *   - IPFS CID reference: ON-CHAIN (stored in GameToken URI)
- *   - Actual metadata content: OFF-CHAIN (IPFS)
- *   - Gateway resolution: OFF-CHAIN (client)
- */
+// Resolves IPFS URIs (ipfs://Qm...) to HTTP gateway URLs for display. Game
+// metadata (title, description, cover image) lives on IPFS and is referenced by
+// GameToken's tokenURI. The CID reference is on-chain; the content and gateway
+// resolution are off-chain (client).
 
 const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
-/**
- * Convert an IPFS URI to an HTTP gateway URL.
- * Handles both ipfs:// prefix and raw CID.
- */
+// Convert an IPFS URI to an HTTP gateway URL. Handles both the ipfs:// prefix
+// and a raw CID.
 export function resolveIpfsUrl(uri: string): string {
   if (!uri) return "";
   if (uri.startsWith("ipfs://")) {
@@ -29,10 +19,8 @@ export function resolveIpfsUrl(uri: string): string {
   return uri;
 }
 
-/**
- * Expected shape of game metadata stored on IPFS.
- * This matches what the Vendor uploads when registering a game.
- */
+// Expected shape of game metadata stored on IPFS, matching what the Vendor
+// uploads when registering a game.
 export interface GameMetadata {
   name: string;
   description: string;

@@ -1,20 +1,9 @@
-/**
- * Machine Hash Generation
- *
- * Generates a deterministic-ish hardware fingerprint on the client side.
- * This hash is sent to ActivationContract.activateLicense() to bind
- * a license to a specific machine.
- *
- * On-chain / Off-chain boundary:
- *   - machineHash generation: OFF-CHAIN (client)
- *   - machineHash storage + verification: ON-CHAIN (ActivationContract)
- *
- * In a production DRM system this would use native OS APIs.
- * For this research prototype, we use browser-available signals
- * to produce a stable-enough fingerprint for demo purposes.
- *
- * [De Alwis et al., 2023] - nonce-based activation verification
- */
+// Generates a deterministic-ish hardware fingerprint on the client, sent to
+// ActivationContract.activateLicense() to bind a license to a machine.
+// Generation is off-chain (client); storage + verification are on-chain. A
+// production DRM system would use native OS APIs — here we use browser signals
+// for a stable-enough fingerprint. [De Alwis et al., 2023] — nonce-based
+// activation verification.
 
 export async function generateMachineHash(): Promise<string> {
   const signals = [
