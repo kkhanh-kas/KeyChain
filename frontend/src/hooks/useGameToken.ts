@@ -19,7 +19,10 @@ export function useGameToken() {
   const getOwnedLicenses = useCallback(
     async (owner: string): Promise<number[]> => {
       if (!gameToken || !store) return [];
-      const [ids] = await store.getCatalog();
+      // getCatalog returns a frozen ethers Result; clone to a plain array so
+      // ethers can pass it into balanceOfBatch without mutating a read-only array.
+      const [idsResult] = await store.getCatalog();
+      const ids = Array.from(idsResult as bigint[]);
       if (ids.length === 0) return [];
       const owners = ids.map(() => owner);
       const balances: bigint[] = await gameToken.balanceOfBatch(owners, ids);
