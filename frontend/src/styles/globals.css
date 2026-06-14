@@ -204,6 +204,7 @@ a {
 .wallet-btn:hover { border-color: var(--accent-primary); }
 .wallet-btn.connected { border-color: var(--accent-primary); color: var(--text-primary); }
 .wallet-btn.wrong { border-color: var(--warning); color: var(--warning); }
+.key-buy-plus { font-size: 14px; line-height: 1; color: var(--accent-primary); }
 .wallet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px color-mix(in oklab, var(--success) 25%, transparent); }
 .wallet-btn.wrong .wallet-dot { background: var(--warning); box-shadow: 0 0 0 3px color-mix(in oklab, var(--warning) 25%, transparent); }
 

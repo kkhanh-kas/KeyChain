@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
+import { BuyKeyButton } from "@/components/layout/BuyKeyButton";
 import { useWallet } from "@/providers/WalletProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { truncateAddress } from "@/lib/format";
@@ -80,10 +81,13 @@ export function Navbar() {
           </button>
         )}
         {status === "connected" && address && (
-          <span className="wallet-btn connected">
-            <span className="wallet-dot" />
-            {truncateAddress(address)}
-          </span>
+          <>
+            <BuyKeyButton />
+            <span className="wallet-btn connected">
+              <span className="wallet-dot" />
+              {truncateAddress(address)}
+            </span>
+          </>
         )}
         {status === "wrong-network" && (
           <button type="button" className="wallet-btn wrong" onClick={switchNetwork}>
