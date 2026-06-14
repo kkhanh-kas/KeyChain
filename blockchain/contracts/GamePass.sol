@@ -74,6 +74,11 @@ contract GamePass {
         emit PassSubscribed(gameId, msg.sender, months, newExpiry);
     }
 
+    /// @notice The monthly price (in KEY) of a game's pass; 0 if not registered.
+    function monthlyPrice(uint256 gameId) external view returns (uint256) {
+        return _passes[gameId].monthlyPrice;
+    }
+
     /// @notice The timestamp at which a subscriber's pass for a game expires.
     function expiryOf(address subscriber, uint256 gameId)
         external
