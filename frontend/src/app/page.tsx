@@ -12,17 +12,19 @@ import { Mascot } from "@/components/Mascot";
 import { CelestialBackground } from "@/components/landing/CelestialBackground";
 
 const FEATURES = [
-  { title: "Own", subtitle: "True Digital Ownership", desc: "Every game license is an NFT on Ethereum. You own it — not the platform, not the publisher. Your key, your game, forever.", symbol: "◆" },
+  { title: "Own", subtitle: "True Digital Ownership", desc: "Every game license is an ERC-1155 token on Ethereum. You own it — not the platform, not the publisher. Your key, your game, forever.", symbol: "◆" },
   { title: "Trade", subtitle: "Secondary Market", desc: "Resell your games on the open marketplace. Royalties are automatically distributed to developers through ERC-2981.", symbol: "◇" },
   { title: "Activate", subtitle: "Hardware-Bound Licenses", desc: "Bind your license to your machine with on-chain activation. Cryptographic proof that you own what you play.", symbol: "▣" },
   { title: "Earn", subtitle: "Automatic Royalties", desc: "Developers earn from every resale. Smart contracts handle the math. No middleman, no dispute, no delay.", symbol: "◈" },
+  { title: "Subscribe", subtitle: "Game Pass", desc: "Time-based access without owning a license. Pay monthly in KEY, renew manually anytime. One transaction, on-chain expiry.", symbol: "◉" },
 ];
 
 const STEPS = [
   { num: "01", label: "Connect", desc: "A MetaMask wallet on Sepolia testnet. No account, no email." },
-  { num: "02", label: "Browse", desc: "A gallery of games. Hover for the title and price. Click for the story." },
-  { num: "03", label: "Buy", desc: "A single transaction. KEY leaves your wallet, a ticket arrives in your library." },
-  { num: "04", label: "Play (or resell)", desc: "Activate the license to bind it, or list it on the Marketplace." },
+  { num: "02", label: "Get KEY", desc: "Swap ETH for KeyCoin (KEY) in one call. KEY is the currency inside KeyChain." },
+  { num: "03", label: "Browse", desc: "A gallery of games. Hover for the title and price. Click for the story." },
+  { num: "04", label: "Buy", desc: "A single transaction. KEY leaves your wallet, a ticket arrives in your library." },
+  { num: "05", label: "Play (or resell)", desc: "Activate the license to bind it, or list it on the Marketplace." },
 ];
 
 const TECH = ["Ethereum", "Solidity", "Hardhat", "OpenZeppelin", "Next.js", "TypeScript", "ethers.js", "MetaMask", "ERC-1155", "ERC-2981", "ERC-20", "IPFS", "Sepolia Testnet", "TailwindCSS"];
@@ -167,8 +169,8 @@ export default function LandingPage() {
             <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, lineHeight: 1.1 }}>From a porcelain shelf<br />to your machine.</h2>
           </div>
           <div style={{ position: "relative" }}>
-            <div style={{ position: "absolute", top: 28, left: "calc(12.5% + 28px)", right: "calc(12.5% + 28px)", borderTop: `2px dashed ${palette.border}` }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24, position: "relative" }}>
+            <div style={{ position: "absolute", top: 28, left: "calc(10% + 28px)", right: "calc(10% + 28px)", borderTop: `2px dashed ${palette.border}` }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 24, position: "relative" }}>
               {STEPS.map((s) => (
                 <div key={s.num} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
                   <div style={{ width: 56, height: 56, borderRadius: "50%", border: `1.5px solid ${palette.accent}`, background: palette.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: palette.accent, marginBottom: 20 }}>{s.num}</div>
