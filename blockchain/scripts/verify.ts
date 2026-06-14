@@ -91,7 +91,6 @@ async function main() {
   }
 
   // Get the network from the Hardhat runtime
-  const { ethers } = await import("hardhat");
   const network = hre.network.name;
 
   console.log(`KeyChain verify  |  network: ${network}`);
@@ -118,7 +117,7 @@ async function main() {
 
   // KEYCOIN_RATE must match the value used at deploy time.
   // If you changed it in deploy.ts, change it here too.
-  const KEYCOIN_RATE = ethers.parseUnits("1000", 18);
+  const KEYCOIN_RATE = 1000n;
 
   console.log(`\nVerifying 6 contracts on ${network}...\n`);
 

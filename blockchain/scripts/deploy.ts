@@ -26,8 +26,9 @@ import hre from "hardhat";
 
 // --- Config ---
 
-/** KEY minted per 1 wei of ETH  (1 ETH -> 1 000 KEY) */
-const KEYCOIN_RATE = ethers.parseUnits("1000", 18);
+/** KEY-wei minted per 1 wei of ETH. rate=1000 → 1 ETH (1e18 wei) yields
+ *  1000e18 KEY-wei = 1 000 KEY. */
+const KEYCOIN_RATE = 1000n;
 
 // --- Helpers ---
 
