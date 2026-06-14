@@ -1,3 +1,5 @@
+/* ── Fonts (must precede all other rules, incl. the inlined Tailwind import) ── */
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap");
 @import "tailwindcss";
 
 /*
@@ -6,9 +8,6 @@
  * Typography: Playfair Display (display) + Inter (body) + JetBrains Mono (data)
  * Reference: design-reference/uploads/KeyChain_Frontend_Design_Brief.md
  */
-
-/* ── Fonts ── */
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap");
 
 /* ── Light theme (default) ── */
 :root {
