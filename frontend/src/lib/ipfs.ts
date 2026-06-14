@@ -3,7 +3,11 @@
 // GameToken's tokenURI. The CID reference is on-chain; the content and gateway
 // resolution are off-chain (client).
 
-const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
+// Prefer the account's dedicated Pinata gateway (more reliable, no shared
+// rate-limit); fall back to the public gateway if it isn't configured.
+const IPFS_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY
+  ? `https://${process.env.NEXT_PUBLIC_PINATA_GATEWAY}/ipfs/`
+  : "https://gateway.pinata.cloud/ipfs/";
 
 // Convert an IPFS URI to an HTTP gateway URL. Handles both the ipfs:// prefix
 // and a raw CID.
