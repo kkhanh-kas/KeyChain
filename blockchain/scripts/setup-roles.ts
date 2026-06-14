@@ -27,8 +27,8 @@ import hre from "hardhat";
  * A vendor can: registerGame(), setGameListed() for their own games.
  */
 const VENDORS: string[] = [
-  // "0xVendorAddress1...",
-  // "0xVendorAddress2...",
+  "0x72e3f9AB76fD34979416B81925F0E8F673F24c00", //Khánh
+  "0x4D7118a9E081749AC47324b87ba8007a557D8613", //Tình
 ];
 
 /**
