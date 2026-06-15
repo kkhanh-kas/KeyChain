@@ -16,6 +16,7 @@ interface LicenseTicketProps {
   cover: string | null;
   status: LicenseStatus;
   askPrice?: bigint; // present when listed
+  passenger?: string; // truncated wallet address for the stub
   busy?: boolean;
   onActivate?: () => void;
   onDeactivate?: () => void;
@@ -49,6 +50,7 @@ export function LicenseTicket({
   cover,
   status,
   askPrice,
+  passenger,
   busy,
   onActivate,
   onDeactivate,
@@ -97,7 +99,10 @@ export function LicenseTicket({
               </>
             )}
             {status === "active" && (
-              <Button variant="secondary" disabled={busy} onClick={onDeactivate}>Deactivate</Button>
+              <>
+                <Button variant="secondary" disabled={busy} onClick={onDeactivate}>Deactivate</Button>
+                <Button variant="secondary" disabled={busy} onClick={onResell}>Resell</Button>
+              </>
             )}
             {status === "listed" && (
               <Button variant="danger" disabled={busy} onClick={onCancelListing}>Cancel Listing</Button>
@@ -128,6 +133,12 @@ export function LicenseTicket({
           </div>
         </div>
         <Barcode />
+        {passenger && (
+          <div className="ticket__stub-row" style={{ marginBottom: 0 }}>
+            <span>Passenger</span>
+            <strong>{passenger}</strong>
+          </div>
+        )}
       </div>
     </article>
   );

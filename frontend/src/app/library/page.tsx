@@ -11,13 +11,14 @@ import { useGameStore } from "@/hooks/useGameStore";
 import { useGameToken } from "@/hooks/useGameToken";
 import { useActivation } from "@/hooks/useActivation";
 import { useMarketplace } from "@/hooks/useMarketplace";
+import { useGamePass } from "@/hooks/useGamePass";
 import { useGameMetadata } from "@/hooks/useGameMetadata";
 import { LicenseTicket } from "@/components/library/LicenseTicket";
 import type { LicenseStatus } from "@/components/library/LicenseTicket";
 import { Button, Modal } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
 import { addressUrl } from "@/lib/constants";
-import { parseKey } from "@/lib/format";
+import { parseKey, truncateAddress } from "@/lib/format";
 
 interface Item {
   tokenId: number;
@@ -33,7 +34,9 @@ export default function LibraryPage() {
   const { getOwnedLicenses } = useGameToken();
   const { isActive, activate, deactivate, pending: actPending } = useActivation();
   const { listings, listLicense, cancelListing, pending: mktPending } = useMarketplace();
+  const { expiryOf, subscribe, pending: passPending } = useGamePass();
 
+  const [passes, setPasses] = useState<{ gameId: number; name: string; expiry: bigint }[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [resellId, setResellId] = useState<number | null>(null);
@@ -73,7 +76,31 @@ export default function LibraryPage() {
     void load();
   }, [load]);
 
-  const ids = useMemo(() => items.map((i) => i.tokenId), [items]);
+  // Active Game Pass subscriptions: a pass is active when its expiry is in the future.
+  const loadPasses = useCallback(async () => {
+    if (!address) {
+      setPasses([]);
+      return;
+    }
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const found: { gameId: number; name: string; expiry: bigint }[] = [];
+    for (const g of games.filter((g) => g.isListed)) {
+      const expiry = await expiryOf(address, g.id);
+      if (expiry > now) found.push({ gameId: g.id, name: g.name, expiry });
+    }
+    setPasses(found);
+  }, [address, games, expiryOf]);
+
+  useEffect(() => {
+    void loadPasses();
+  }, [loadPasses]);
+
+  // Hide tickets/listings for games no longer in the active catalog (delisted/old
+  // seed games), matching the Store. Tokens stay on-chain — just not shown here.
+  const listedIds = useMemo(() => new Set(games.filter((g) => g.isListed).map((g) => g.id)), [games]);
+  const visibleItems = useMemo(() => items.filter((i) => listedIds.has(i.tokenId)), [items, listedIds]);
+
+  const ids = useMemo(() => visibleItems.map((i) => i.tokenId), [visibleItems]);
   const meta = useGameMetadata(ids);
   const nameOf = (id: number) => games.find((g) => g.id === id)?.name ?? `Game #${id}`;
 
@@ -97,7 +124,7 @@ export default function LibraryPage() {
     );
   }
 
-  if (!loading && items.length === 0) {
+  if (!loading && visibleItems.length === 0 && passes.length === 0) {
     return (
       <div className="library page-shell">
         <div className="empty">
@@ -110,7 +137,7 @@ export default function LibraryPage() {
     );
   }
 
-  const activeCount = items.filter((i) => i.status === "active").length;
+  const activeCount = visibleItems.filter((i) => i.status === "active").length;
 
   return (
     <div className="library page-shell">
@@ -119,10 +146,10 @@ export default function LibraryPage() {
           <div className="section-marker">Your Library</div>
           <h1 className="library__title" style={{ marginTop: 12 }}>Tickets.</h1>
         </div>
-        <div className="library__count">{items.length} owned · {activeCount} active</div>
+        <div className="library__count">{visibleItems.length} owned · {activeCount} active</div>
       </div>
 
-      {items.map((item) => {
+      {visibleItems.map((item) => {
         const d = meta.get(item.tokenId);
         return (
           <LicenseTicket
@@ -133,6 +160,7 @@ export default function LibraryPage() {
             cover={d.cover}
             status={item.status}
             askPrice={item.askPrice}
+            passenger={address ? truncateAddress(address) : undefined}
             busy={busy}
             onActivate={async () => { await activate(item.tokenId); await load(); }}
             onDeactivate={async () => { await deactivate(item.tokenId); await load(); }}
@@ -142,6 +170,29 @@ export default function LibraryPage() {
           />
         );
       })}
+
+      {passes.length > 0 && (
+        <div className="library__passes">
+          <div className="section-marker" style={{ marginTop: 8, marginBottom: 16 }}>Game Pass · Subscriptions</div>
+          {passes.map((p) => (
+            <div key={p.gameId} className="pass-row">
+              <div>
+                <div className="pass-row__name">{p.name}</div>
+                <div className="pass-row__meta">
+                  Active until {new Date(Number(p.expiry) * 1000).toLocaleDateString()}
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                disabled={passPending}
+                onClick={async () => { await subscribe(p.gameId, 1); await loadPasses(); }}
+              >
+                {passPending ? <><span className="spinner" /> …</> : "Renew · 1 month"}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Modal open={resellId !== null} onClose={() => setResellId(null)} title="List for resale">
         <p style={{ color: "var(--text-secondary)", marginBottom: 16 }}>
