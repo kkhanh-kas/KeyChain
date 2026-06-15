@@ -1,7 +1,12 @@
 "use client";
 
 // Modal primitive: renders nothing when closed. Clicking the backdrop closes it;
-// clicks inside the panel are stopped from bubbling.
+// clicks inside the panel are stopped from bubbling. Rendered through a portal to
+// document.body so a fixed-position backdrop covers the whole viewport even when
+// the trigger lives inside a transformed/filtered ancestor (e.g. the navbar).
+
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   open: boolean;
@@ -11,8 +16,17 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children }: ModalProps) {
-  if (!open) return null;
-  return (
+  // Close on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         {title ? (
@@ -30,6 +44,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         ) : null}
         <div className="modal__body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

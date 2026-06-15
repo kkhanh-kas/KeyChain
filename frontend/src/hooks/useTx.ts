@@ -6,6 +6,7 @@
 import { useCallback, useState } from "react";
 import type { ContractTransactionResponse } from "ethers";
 import { useToast } from "@/providers/ToastProvider";
+import { friendlyError } from "@/lib/errors";
 
 export function useTx() {
   const { push } = useToast();
@@ -18,9 +19,11 @@ export function useTx() {
         const tx = await send();
         const receipt = await tx.wait();
         push({ type: "success", title, hash: tx.hash });
+        // Tell the shared KEY balance to refresh (navbar chip, Member Card, etc.).
+        window.dispatchEvent(new Event("keychain:tx"));
         return receipt;
       } catch (err) {
-        push({ type: "error", title: `${title} failed`, msg: (err as Error).message });
+        push({ type: "error", title: `${title} failed`, msg: friendlyError(err) });
         throw err;
       } finally {
         setPending(false);

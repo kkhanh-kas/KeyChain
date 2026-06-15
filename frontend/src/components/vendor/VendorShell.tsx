@@ -39,6 +39,7 @@ export function VendorShell({ active, onSelect, children }: VendorShellProps) {
             {item.label}
           </button>
         ))}
+        <Link href="/store" className="vendor__link vendor__link--exit">← Back to KeyChain</Link>
       </aside>
       <main className="vendor__main">{children}</main>
     </div>
