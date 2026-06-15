@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { WalletProvider } from "@/providers/WalletProvider";
+import { KeyBalanceProvider } from "@/providers/KeyBalanceProvider";
 import { ToastProvider } from "@/providers/ToastProvider";
+import { SearchProvider } from "@/providers/SearchProvider";
 import { Navbar } from "@/components/layout/Navbar";
 
 export const metadata: Metadata = {
@@ -24,10 +26,14 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <WalletProvider>
-            <ToastProvider>
-              <Navbar />
-              {children}
-            </ToastProvider>
+            <KeyBalanceProvider>
+              <ToastProvider>
+                <SearchProvider>
+                  <Navbar />
+                  {children}
+                </SearchProvider>
+              </ToastProvider>
+            </KeyBalanceProvider>
           </WalletProvider>
         </ThemeProvider>
       </body>
