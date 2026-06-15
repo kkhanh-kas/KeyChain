@@ -4,12 +4,15 @@
 // whose appearance follows useWallet().status. Ported from
 // design-reference/components/shell.jsx to Next routing.
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Mascot } from "@/components/Mascot";
 import { BuyKeyButton } from "@/components/layout/BuyKeyButton";
+import { StudentCard } from "@/components/layout/StudentCard";
 import { useWallet } from "@/providers/WalletProvider";
 import { useTheme } from "@/providers/ThemeProvider";
+import { useSearch } from "@/providers/SearchProvider";
 import { truncateAddress } from "@/lib/format";
 
 const TABS = [
@@ -39,11 +42,14 @@ export function Navbar() {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
   const { status, address, switchNetwork, connect } = useWallet();
+  const { query, setQuery } = useSearch();
+  const [cardOpen, setCardOpen] = useState(false);
 
   // Landing is the entrance and the Vendor portal has its own shell; no navbar.
   if (pathname === "/" || pathname.startsWith("/vendor")) return null;
 
   return (
+    <>
     <nav className="navbar">
       <Link href="/store" className="navbar__brand">
         <Mascot size={32} />
@@ -67,7 +73,11 @@ export function Navbar() {
 
       <div className="navbar__right">
         <div className="navbar__search">
-          <input placeholder="Search games, vendors, tokens…" />
+          <input
+            placeholder="Search games, vendors, tokens…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
 
         {status === "disconnected" && (
@@ -83,10 +93,10 @@ export function Navbar() {
         {status === "connected" && address && (
           <>
             <BuyKeyButton />
-            <span className="wallet-btn connected">
+            <button type="button" className="wallet-btn connected" onClick={() => setCardOpen(true)}>
               <span className="wallet-dot" />
               {truncateAddress(address)}
-            </span>
+            </button>
           </>
         )}
         {status === "wrong-network" && (
@@ -101,5 +111,7 @@ export function Navbar() {
         </button>
       </div>
     </nav>
+    {cardOpen && <StudentCard onClose={() => setCardOpen(false)} />}
+    </>
   );
 }
