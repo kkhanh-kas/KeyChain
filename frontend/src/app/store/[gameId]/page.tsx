@@ -22,7 +22,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ gameId: s
   const router = useRouter();
 
   const { games, loading, purchaseLicense, pending } = useGameStore();
-  const { getOwnedLicenses } = useGameToken();
+  const { getOwnedLicenses, royaltyInfo } = useGameToken();
   const { address, status } = useWallet();
   const { balance } = useKeyBalance();
   const meta = useGameMetadata([id]);
@@ -30,10 +30,18 @@ export default function GameDetailPage({ params }: { params: Promise<{ gameId: s
   const game = games.find((g) => g.id === id);
   const display = meta.get(id);
   const [owned, setOwned] = useState(false);
+  const [royaltyPct, setRoyaltyPct] = useState<number | null>(null);
 
   useEffect(() => {
     if (address) getOwnedLicenses(address).then((ids) => setOwned(ids.includes(id)));
   }, [address, id, getOwnedLicenses]);
+
+  // royaltyInfo(id, 10000) returns amount = bps (salePrice * bps / 10000), so % = bps / 100.
+  useEffect(() => {
+    royaltyInfo(id, BigInt(10000))
+      .then(([, bps]) => setRoyaltyPct(Number(bps) / 100))
+      .catch(() => setRoyaltyPct(null));
+  }, [id, royaltyInfo]);
 
   async function buy() {
     if (!game) return;
@@ -73,6 +81,11 @@ export default function GameDetailPage({ params }: { params: Promise<{ gameId: s
             <div>
               <div className="detail__price-label">List price</div>
               <div className="detail__price">{formatKey(game.price)}<small>KEY</small></div>
+              {royaltyPct !== null && (
+                <div className="eyebrow" style={{ marginTop: 4 }}>
+                  Includes {royaltyPct}% royalty to {game.vendor.slice(0, 10)}…
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <Button variant="secondary" large onClick={() => router.push("/store")}>Cancel</Button>
@@ -96,6 +109,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ gameId: s
             <Meta label="Token Standard" value="ERC-1155 · ERC-2981" />
             <Meta label="License Type" value="Perpetual" serif />
             <Meta label="Token ID" value={`#${game.id}`} />
+            {royaltyPct !== null && <Meta label="Royalty" value={`${royaltyPct}% to vendor`} />}
             <Meta label="Vendor" value={game.vendor} />
             <Meta label="Network" value={`Sepolia · ChainID ${TARGET_CHAIN_ID}`} />
             <Meta label="Status" value={game.isListed ? "Listed for sale" : "Delisted"} />
