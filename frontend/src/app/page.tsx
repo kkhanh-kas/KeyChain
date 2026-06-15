@@ -24,7 +24,7 @@ const STEPS = [
   { num: "02", label: "Get KEY", desc: "Swap ETH for KeyCoin (KEY) in one call. KEY is the currency inside KeyChain." },
   { num: "03", label: "Browse", desc: "A gallery of games. Hover for the title and price. Click for the story." },
   { num: "04", label: "Buy", desc: "A single transaction. KEY leaves your wallet, a ticket arrives in your library." },
-  { num: "05", label: "Play (or resell)", desc: "Activate the license to bind it, or list it on the Marketplace." },
+  { num: "05", label: "Play/resell", desc: "Activate the license to bind it, or list it on the Marketplace." },
 ];
 
 const TECH = ["Ethereum", "Solidity", "Hardhat", "OpenZeppelin", "Next.js", "TypeScript", "ethers.js", "MetaMask", "ERC-1155", "ERC-2981", "ERC-20", "IPFS", "Sepolia Testnet", "TailwindCSS"];
@@ -126,7 +126,7 @@ export default function LandingPage() {
         </div>
 
         {/* FEATURES */}
-        <section id="features" ref={(el) => { refs.current.features = el; }} style={{ ...reveal("features"), padding: "120px 24px", maxWidth: 1100, margin: "0 auto" }}>
+        <section id="features" ref={(el) => { refs.current.features = el; }} style={{ ...reveal("features"), padding: "120px 24px", maxWidth: 1280, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 72 }}>
             <div className="section-marker" style={{ justifyContent: "center", marginBottom: 16 }}>Core Principles</div>
             <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700 }}>What Makes KeyChain Different</h2>
@@ -134,7 +134,7 @@ export default function LandingPage() {
               A game store built on transparency, ownership, and fairness — powered by Ethereum smart contracts.
             </p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+          <div className="features-grid">
             {FEATURES.map((f) => (
               <div key={f.title} style={{ background: palette.bgSecondary, border: `1px solid ${palette.border}`, borderRadius: 14, padding: "32px 24px" }}>
                 <div style={{ fontFamily: "var(--font-display)", fontSize: 28, color: palette.accent, marginBottom: 14, opacity: 0.6 }}>{f.symbol}</div>
@@ -166,7 +166,7 @@ export default function LandingPage() {
         <section id="how" ref={(el) => { refs.current.how = el; }} style={{ ...reveal("how"), padding: "120px 24px", maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ marginBottom: 72, maxWidth: 600 }}>
             <div className="section-marker" style={{ marginBottom: 16 }}>How It Works</div>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, lineHeight: 1.1 }}>From a porcelain shelf<br />to your machine.</h2>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, lineHeight: 1.1 }}>From your wallet<br />to your machine.</h2>
           </div>
           <div style={{ position: "relative" }}>
             <div style={{ position: "absolute", top: 28, left: "calc(10% + 28px)", right: "calc(10% + 28px)", borderTop: `2px dashed ${palette.border}` }} />

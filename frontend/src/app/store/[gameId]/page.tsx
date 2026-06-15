@@ -10,6 +10,7 @@ import { useGameStore } from "@/hooks/useGameStore";
 import { useGameToken } from "@/hooks/useGameToken";
 import { useGamePass } from "@/hooks/useGamePass";
 import { useWallet } from "@/providers/WalletProvider";
+import { useKeyBalance } from "@/providers/KeyBalanceProvider";
 import { useGameMetadata } from "@/hooks/useGameMetadata";
 import { Button } from "@/components/ui";
 import { formatKey } from "@/lib/format";
@@ -23,6 +24,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ gameId: s
   const { games, loading, purchaseLicense, pending } = useGameStore();
   const { getOwnedLicenses } = useGameToken();
   const { address, status } = useWallet();
+  const { balance } = useKeyBalance();
   const meta = useGameMetadata([id]);
 
   const game = games.find((g) => g.id === id);
@@ -78,6 +80,8 @@ export default function GameDetailPage({ params }: { params: Promise<{ gameId: s
                 <Button variant="primary" large disabled>Connect wallet to buy</Button>
               ) : owned ? (
                 <Button variant="primary" large disabled>Owned in Library</Button>
+              ) : balance < game.price ? (
+                <Button variant="primary" large disabled title="Buy KEY first">Need more KEY · Buy KEY first</Button>
               ) : (
                 <Button variant="primary" large disabled={pending} onClick={buy}>
                   {pending ? <><span className="spinner" /> Confirming…</> : `Buy Now · ${formatKey(game.price)} KEY`}

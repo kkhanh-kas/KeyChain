@@ -9,7 +9,9 @@ import { useMarketplace } from "@/hooks/useMarketplace";
 import type { Listing } from "@/hooks/useMarketplace";
 import { useGameStore } from "@/hooks/useGameStore";
 import { useWallet } from "@/providers/WalletProvider";
+import { useKeyBalance } from "@/providers/KeyBalanceProvider";
 import { useGameMetadata } from "@/hooks/useGameMetadata";
+import { useSearch } from "@/providers/SearchProvider";
 import { GameCard } from "@/components/game/GameCard";
 import { Button, Modal } from "@/components/ui";
 import { Mascot } from "@/components/Mascot";
@@ -19,17 +21,32 @@ export default function MarketplacePage() {
   const { listings, loading, buyLicense, pending } = useMarketplace();
   const { games } = useGameStore();
   const { address, status } = useWallet();
+  const { balance } = useKeyBalance();
 
-  const ids = useMemo(() => listings.map((l) => l.tokenId), [listings]);
+  // Only show listings for games still in the active catalog (delisted/old seed
+  // games are hidden, matching the Store).
+  const listedIds = useMemo(() => new Set(games.filter((g) => g.isListed).map((g) => g.id)), [games]);
+  const visibleListings = useMemo(
+    () => listings.filter((l) => listedIds.has(l.tokenId)),
+    [listings, listedIds]
+  );
+
+  const ids = useMemo(() => visibleListings.map((l) => l.tokenId), [visibleListings]);
   const meta = useGameMetadata(ids);
   const nameOf = (id: number) => games.find((g) => g.id === id)?.name ?? `Game #${id}`;
 
   const [filter, setFilter] = useState("All");
+  const { query } = useSearch();
+  const q = query.trim().toLowerCase();
   const genres = useMemo(
     () => ["All", ...Array.from(new Set(ids.map((id) => meta.get(id).genre)))],
     [ids, meta]
   );
-  const shown = listings.filter((l) => filter === "All" || meta.get(l.tokenId).genre === filter);
+  const shown = visibleListings.filter(
+    (l) =>
+      (filter === "All" || meta.get(l.tokenId).genre === filter) &&
+      (q === "" || nameOf(l.tokenId).toLowerCase().includes(q))
+  );
 
   const [selected, setSelected] = useState<Listing | null>(null);
   const isOwn = selected ? selected.seller.toLowerCase() === address?.toLowerCase() : false;
@@ -69,7 +86,7 @@ export default function MarketplacePage() {
             <div className="empty__msg">When holders list a game, it shows up here.</div>
           </div>
         ) : (
-          <div className="gallery" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="gallery gallery--wide">
             {shown.map((l) => {
               const d = meta.get(l.tokenId);
               return (
@@ -100,6 +117,8 @@ export default function MarketplacePage() {
               <Button variant="primary" disabled>Connect wallet to buy</Button>
             ) : isOwn ? (
               <Button variant="primary" disabled>This is your listing</Button>
+            ) : balance < selected.price ? (
+              <Button variant="primary" disabled title="Buy KEY first">Need more KEY · Buy KEY first</Button>
             ) : (
               <Button variant="primary" disabled={pending} onClick={buy}>
                 {pending ? <><span className="spinner" /> Confirming…</> : `Buy · ${formatKey(selected.price)} KEY`}

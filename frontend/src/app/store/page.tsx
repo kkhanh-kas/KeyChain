@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGameStore } from "@/hooks/useGameStore";
 import { useGameMetadata } from "@/hooks/useGameMetadata";
+import { useSearch } from "@/providers/SearchProvider";
 import { GameCard } from "@/components/game/GameCard";
 import { Mascot } from "@/components/Mascot";
 
@@ -21,11 +22,17 @@ export default function StorePage() {
   const meta = useGameMetadata(ids);
 
   const [filter, setFilter] = useState("All");
+  const { query } = useSearch();
+  const q = query.trim().toLowerCase();
   const genres = useMemo(
     () => ["All", ...Array.from(new Set(ids.map((id) => meta.get(id).genre)))],
     [ids, meta]
   );
-  const shown = listed.filter((g) => filter === "All" || meta.get(g.id).genre === filter);
+  const shown = listed.filter(
+    (g) =>
+      (filter === "All" || meta.get(g.id).genre === filter) &&
+      (q === "" || g.name.toLowerCase().includes(q))
+  );
 
   const covers = listed.map((g) => meta.get(g.id).cover).filter(Boolean) as string[];
 
@@ -49,7 +56,7 @@ export default function StorePage() {
             <div className="section-marker">The Gallery</div>
             <h1 className="store__title" style={{ marginTop: 12 }}>Store.</h1>
             <p style={{ color: "var(--text-secondary)", marginTop: 8, maxWidth: 560 }}>
-              A curated shelf. Every cover is the work of its studio. Hover for the price; click for the story.
+              A curated shelf. Every cover is the work of its studio. Hover for the price, click for the story!
             </p>
           </div>
           <div className="store__filters">
