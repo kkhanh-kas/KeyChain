@@ -18,10 +18,17 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {},
     sepolia: {
-      url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      // Alchemy RPC was returning inconsistent mempool state and not propagating
+      // txs; using a public endpoint for reliable broadcast. To revert, swap back
+      // to: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`
+      url: "https://ethereum-sepolia-rpc.publicnode.com",
       accounts: process.env.DEPLOYER_PRIVATE_KEY
         ? [process.env.DEPLOYER_PRIVATE_KEY]
         : [],
+      // Force a high legacy gas price so deploy txs don't sit pending on a busy
+      // testnet, and so re-running replaces any stuck (underpriced) tx at the
+      // same nonce. Sepolia ETH is free, so over-paying gas is harmless.
+      gasPrice: 50_000_000_000, // 50 gwei
     },
   },
   etherscan: {
