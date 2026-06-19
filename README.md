@@ -80,8 +80,6 @@ Tiền lệ pháp lý: vụ *UsedSoft v. Oracle (2012)* đã xác lập rằng g
 
 ## Hình ảnh minh họa
 
-> Đặt media vào thư mục `frontend/public/screenshots/` rồi cập nhật đường dẫn bên dưới. Trang chủ dùng GIF, các trang còn lại dùng ảnh PNG.
-
 **Trang chủ (Landing)**
 
 ![Trang chủ](frontend/public/screenshots/landing.gif)
