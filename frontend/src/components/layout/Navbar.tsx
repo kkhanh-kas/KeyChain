@@ -13,6 +13,7 @@ import { StudentCard } from "@/components/layout/StudentCard";
 import { useWallet } from "@/providers/WalletProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { useSearch } from "@/providers/SearchProvider";
+import { useIsVendor } from "@/hooks/useIsVendor";
 import { truncateAddress } from "@/lib/format";
 
 const TABS = [
@@ -43,6 +44,7 @@ export function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { status, address, switchNetwork, connect } = useWallet();
   const { query, setQuery } = useSearch();
+  const isVendor = useIsVendor();
   const [cardOpen, setCardOpen] = useState(false);
 
   // Landing is the entrance and the Vendor portal has its own shell; no navbar.
@@ -69,6 +71,14 @@ export function Navbar() {
             </Link>
           );
         })}
+        {isVendor && (
+          <Link
+            href="/vendor"
+            className={`navbar__tab ${pathname.startsWith("/vendor") ? "navbar__tab--active" : ""}`}
+          >
+            Vendor
+          </Link>
+        )}
       </div>
 
       <div className="navbar__right">
